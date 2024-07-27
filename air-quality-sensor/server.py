@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import psycopg2
 from psycopg2 import sql
+from datetime import datetime
+import pytz
 
 DATABASE_URL = "postgresql://server:redactedPassword@10.10.10.253:5432/storage"
 
@@ -53,11 +55,12 @@ async def receive_data(data: SensorData):
 
     try:
         with conn.cursor() as cursor:
+            current_time = datetime.now(pytz.utc)
             insert_query = sql.SQL("""
-                INSERT INTO storage (pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, nox, voc)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO storage (pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, nox, voc, time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """)
-            cursor.execute(insert_query, (pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, nox, voc))
+            cursor.execute(insert_query, (pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, nox, voc, current_time))
             conn.commit()
     except Exception as e:
         conn.rollback()

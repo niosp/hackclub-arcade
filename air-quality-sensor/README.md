@@ -21,3 +21,10 @@ The solution should be rather cheap so other ppl can make use of this project wi
 
 ### Used libraries
 - Sen55: https://github.com/Sensirion/embedded-i2c-sen5x
+
+### Todo
+- Writing documentation (how to import the database schema, grafana dashboards etc.)
+- testing and bug fixing on the esp32
+
+### Grafana dashboard 
+![Grafana dashboard](image.png)
