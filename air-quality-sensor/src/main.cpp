@@ -9,6 +9,7 @@
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
 #include "esp_wifi.h"
+#include "esp_http_client.h"
 #include "esp_task_wdt.h"
 #include "esp_log.h"
 #include "esp_event.h"
@@ -273,6 +274,31 @@ extern "C" void app_main(void)
         cJSON_AddNumberToObject(hum_json, "hum_json", sen5x_values[6]);
         cJSON_AddNumberToObject(temp_json, "temp_json", sen5x_values[7]);
         cJSON_AddNumberToObject(co2_json, "co2_json", scd4x_values[0]);
+        // add the single json objects to the array, so the array can be sent over wifi to server
+        cJSON_AddItemToArray(final_data,pm1p0_json );
+        cJSON_AddItemToArray(final_data,pm2p5_json );
+        cJSON_AddItemToArray(final_data,pm4p0_json );
+        cJSON_AddItemToArray(final_data,pm10p0_json);
+        cJSON_AddItemToArray(final_data,noc_json);
+        cJSON_AddItemToArray(final_data,voc_json);
+        cJSON_AddItemToArray(final_data,hum_json);
+        cJSON_AddItemToArray(final_data,temp_json);
+        cJSON_AddItemToArray(final_data,co2_json);
+        // convert to text! so it can be sent so server
+        char* json_text = cJSON_PrintUnformatted(final_data);
+        esp_http_client_config_t config = {
+            .url = SERVER_URL,
+            .auth_type = HTTP_AUTH_TYPE_BASIC,
+            // todo !!!!!!!! add server certificate !!!
+            .cert_pem = (char *)"",
+            .buffer_size_tx = 4096,
+        };
+        esp_http_client_handle_t client = esp_http_client_init(&config);
+        esp_http_client_set_method(client, HTTP_METHOD_POST);
+        esp_http_client_set_header(client, "Content-Type", "application/json");
+        esp_http_client_set_post_field(client, json_text, strlen(json_text));
+        ESP_ERROR_CHECK(esp_http_client_perform(client));
+        ESP_ERROR_CHECK(esp_http_client_cleanup(client));
     }
 
     // free resources, to save memory!!!
