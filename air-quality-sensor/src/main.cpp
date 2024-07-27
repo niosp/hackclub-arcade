@@ -18,11 +18,13 @@
 #include "sensirion-lib/scd4x_i2c.h"
 #include "sensirion-lib/sensirion_i2c_hal.h"
 #include "sensirion-lib/sensirion_common.h"
+#include "cJSON.h"
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 #define EX_UART_NUM UART_NUM_1
 #define FIRMWARE_VERSION 1
+#define SERVER_URL "http://10.10.10.253:8000/data"
 
 int s_retry_num = 0;
 uint8_t connected_bit = 0;
@@ -88,11 +90,10 @@ int8_t get_sen5x_values(uint16_t *arr){
     arr[1] = mass_concentration_pm2p5;
     arr[2] = mass_concentration_pm4p0;
     arr[3] = mass_concentration_pm10p0;
-    arr[4] = mass_concentration_pm10p0;
-    arr[5] = ambient_humidity;
-    arr[6] = ambient_temperature;
-    arr[7] = voc_index;
-    arr[8] = nox_index;
+    arr[4] = ambient_humidity;
+    arr[5] = ambient_temperature;
+    arr[6] = voc_index;
+    arr[7] = nox_index;
     // measurement failed, return -1
     return -3;
 }
@@ -172,9 +173,10 @@ int8_t connect_to_wifi(){
     ESP_ERROR_CHECK(esp_netif_init());
     // fix: https://github.com/espressif/esp-idf/issues/5609
     esp_event_loop_create_default();
-    // ESP_ERROR_CHECK(esp_event_loop_create_default());
+    // create wifi STA station context
     sta_ptr = esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    // init wifi itnerface
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
@@ -247,7 +249,31 @@ extern "C" void app_main(void)
     int8_t return_code_scd = get_scd4x_values(scd4x_values);
 
     // send measured values over wifi to a server (to be implemented)
-    connect_to_wifi();
+    int8_t conn = connect_to_wifi();
+    if(conn == ESP_OK){
+        // allocate memory for cson lib parts
+        cJSON* final_data = cJSON_CreateArray();
+        // create json objects for the values
+        cJSON* pm1p0_json = cJSON_CreateObject();
+        cJSON* pm2p5_json = cJSON_CreateObject();
+        cJSON* pm4p0_json = cJSON_CreateObject();
+        cJSON* pm10p0_json = cJSON_CreateObject();
+        cJSON* noc_json = cJSON_CreateObject();
+        cJSON* voc_json = cJSON_CreateObject();
+        cJSON* hum_json = cJSON_CreateObject();
+        cJSON* temp_json = cJSON_CreateObject();
+        cJSON* co2_json = cJSON_CreateObject();
+        // add the values to the objects
+        cJSON_AddNumberToObject(pm1p0_json , "pm1p0_json", sen5x_values[0]);
+        cJSON_AddNumberToObject(pm2p5_json , "pm2p5_json", sen5x_values[1]);
+        cJSON_AddNumberToObject(pm4p0_json , "pm4p0_json", sen5x_values[2]);
+        cJSON_AddNumberToObject(pm10p0_json, "pm10p0_json", sen5x_values[3]);
+        cJSON_AddNumberToObject(noc_json, "noc_json", sen5x_values[4]);
+        cJSON_AddNumberToObject(voc_json, "voc_json", sen5x_values[5]);
+        cJSON_AddNumberToObject(hum_json, "hum_json", sen5x_values[6]);
+        cJSON_AddNumberToObject(temp_json, "temp_json", sen5x_values[7]);
+        cJSON_AddNumberToObject(co2_json, "co2_json", scd4x_values[0]);
+    }
 
     // free resources, to save memory!!!
     delete[] sen5x_values;
