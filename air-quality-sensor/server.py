@@ -1,7 +1,19 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import psycopg2
+from psycopg2 import sql
 
-# Define the data model
+DATABASE_URL = "postgresql://server:redactedPassword@10.10.10.253:5432/storage"
+
+def get_db_connection():
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        print(f"Error connecting to the database: {e}")
+        return None
+
+# data model : (retrieved as json from server)
 class SensorData(BaseModel):
     pm1p0: float
     pm2p5: float
@@ -16,7 +28,6 @@ app = FastAPI()
 
 @app.post("/data")
 async def receive_data(data: SensorData):
-    # Store the values in variables
     pm1p0 = data.pm1p0
     pm2p5 = data.pm2p5
     pm4p0 = data.pm4p0
@@ -26,7 +37,6 @@ async def receive_data(data: SensorData):
     nox = data.nox
     voc = data.voc
 
-    # Print the values to the console
     print(f"PM1.0: {pm1p0}")
     print(f"PM2.5: {pm2p5}")
     print(f"PM4.0: {pm4p0}")
@@ -36,7 +46,26 @@ async def receive_data(data: SensorData):
     print(f"NOx: {nox}")
     print(f"VOC: {voc}")
 
-    return {"message": "Data received successfully"}
+    # store values in database
+    conn = get_db_connection()
+    if conn is None:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        with conn.cursor() as cursor:
+            insert_query = sql.SQL("""
+                INSERT INTO storage (pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, nox, voc)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """)
+            cursor.execute(insert_query, (pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, nox, voc))
+            conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to insert data: {e}")
+    finally:
+        conn.close()
+
+    return {"message": "Data received and stored successfully"}
 
 if __name__ == "__main__":
     import uvicorn
