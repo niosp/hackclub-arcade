@@ -4,14 +4,36 @@
 #include <stdio.h>
 #include <memory.h>
 #include <string>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "nvs_flash.h"
+#include "esp_wifi.h"
+#include "esp_task_wdt.h"
 #include "esp_log.h"
+#include "esp_event.h"
+#include "esp_wifi_types.h"
+#include "esp_system.h"
 #include "sensirion-lib/sen5x_i2c.h"
 #include "sensirion-lib/scd4x_i2c.h"
 #include "sensirion-lib/sensirion_i2c_hal.h"
 #include "sensirion-lib/sensirion_common.h"
 
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+#define EX_UART_NUM UART_NUM_1
 #define FIRMWARE_VERSION 1
+
+int s_retry_num = 0;
+uint8_t connected_bit = 0;
+EventGroupHandle_t s_wifi_event_group;
+
+wifi_config_t g_wifi_config = {
+        .sta = {
+            .ssid = "redacted",
+            .password = "redacted",
+        },
+};
 
 int8_t get_sen5x_values(uint16_t *arr){
     // read some basic values ...
@@ -75,10 +97,6 @@ int8_t get_sen5x_values(uint16_t *arr){
     return -3;
 }
 
-int8_t connect_to_wifi(){
-    // to be implemented
-}
-
 int8_t get_scd4x_values(int32_t *arr){
     // error code used later (return val of sensirion library functions)
     int16_t error_code = 0;
@@ -122,6 +140,78 @@ int8_t get_scd4x_values(int32_t *arr){
     }
 }
 
+static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
+{
+    // STA_START signal -> connect
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < 10) {
+            // try to reconnect after disconnect (10 times)
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI("event_handler", "retry to connect to the AP");
+        } else {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        }
+        // connection failed
+        ESP_LOGI("event_handler","connect to the AP fail");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        // GOT_IP signal -> print ip to console
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI("event_handler", "got ip: " IPSTR, IP2STR(&event->ip_info.ip));
+        s_retry_num = 0;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    }
+}
+
+esp_netif_t *sta_ptr;
+int8_t connect_to_wifi(){
+    s_wifi_event_group = xEventGroupCreate();
+    ESP_ERROR_CHECK(esp_netif_init());
+    // fix: https://github.com/espressif/esp-idf/issues/5609
+    esp_event_loop_create_default();
+    // ESP_ERROR_CHECK(esp_event_loop_create_default());
+    sta_ptr = esp_netif_create_default_wifi_sta();
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &g_wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start() );
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            portMAX_DELAY);
+    // connected to wifi!
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI("connect_to_wifi", "connected to ap");
+        connected_bit = 1;
+        return ESP_OK;
+    } else if (bits & WIFI_FAIL_BIT) {
+        // connection failed
+        ESP_LOGI("connect_to_wifi", "Failed to connect");
+    } else {
+        ESP_LOGE("connect_to_wifi", "UNEXPECTED EVENT");
+    }
+    // no connection, return fail
+    return ESP_FAIL;
+}
+
 extern "C" void app_main(void)
 {
     // set the esp32 log level 
@@ -151,13 +241,13 @@ extern "C" void app_main(void)
     sensirion_i2c_hal_init();
     // alloc memory for the arr passed after
     uint16_t* sen5x_values = new uint16_t[8];
-    auto return_code_sen = get_sen5x_values(sen5x_values);
+    int8_t return_code_sen = get_sen5x_values(sen5x_values);
     // scd4x carbon dioxide measurement
     int32_t* scd4x_values = new int32_t[3];
-    auto return_code_scd = get_scd4x_values(scd4x_values);
+    int8_t return_code_scd = get_scd4x_values(scd4x_values);
 
     // send measured values over wifi to a server (to be implemented)
-    
+    connect_to_wifi();
 
     // free resources, to save memory!!!
     delete[] sen5x_values;
