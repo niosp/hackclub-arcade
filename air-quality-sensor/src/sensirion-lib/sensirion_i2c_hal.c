@@ -32,6 +32,7 @@
 #include "sensirion_i2c_hal.h"
 #include "sensirion_common.h"
 #include "sensirion_config.h"
+#include "driver/i2c.h"
 
 /*
  * INSTRUCTIONS
@@ -52,11 +53,30 @@
  * @returns         0 on success, an error code otherwise
  */
 int16_t sensirion_i2c_hal_select_bus(uint8_t bus_idx) {
-    /* TODO:IMPLEMENT or leave empty if all sensors are located on one single
-     * bus
-     */
-    return NOT_IMPLEMENTED_ERROR;
+    i2c_driver_delete(I2C_NUM_0);
+    i2c_config_t conf;
+    if (bus_idx == 0x62) {
+        conf.mode = I2C_MODE_MASTER;
+        conf.sda_io_num = 32;
+        conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+        conf.scl_io_num = 33;
+        conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+        conf.master.clk_speed = 100000;
+        conf.clk_flags = 0;
+    } else if (bus_idx == 0x69) {
+        conf.mode = I2C_MODE_MASTER;
+        conf.sda_io_num = 16;
+        conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+        conf.scl_io_num = 4;
+        conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+        conf.master.clk_speed = 100000;
+        conf.clk_flags = 0;
+    }
+    i2c_param_config(I2C_NUM_0, &conf);
+    i2c_driver_install(I2C_NUM_0, conf.mode, 0, 0, 0);
+    return 0;
 }
+
 
 /**
  * Initialize all hard- and software components that are needed for the I2C
