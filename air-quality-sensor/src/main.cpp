@@ -75,6 +75,10 @@ int8_t get_sen5x_values(uint16_t *arr){
     return -3;
 }
 
+int8_t connect_to_wifi(){
+    // to be implemented
+}
+
 int8_t get_scd4x_values(int32_t *arr){
     // error code used later (return val of sensirion library functions)
     int16_t error_code = 0;
@@ -146,14 +150,16 @@ extern "C" void app_main(void)
     // init the sensirion hal so it can be used by both following functions
     sensirion_i2c_hal_init();
     // alloc memory for the arr passed after
-    uint16_t* sen5x_values = (uint16_t*)malloc(sizeof(uint16_t) * 8);
+    uint16_t* sen5x_values = new uint16_t[8];
     auto return_code_sen = get_sen5x_values(sen5x_values);
     // scd4x carbon dioxide measurement
-    int32_t* scd4x_values = (int32_t*)malloc(sizeof(int32_t) * 3);
+    int32_t* scd4x_values = new int32_t[3];
     auto return_code_scd = get_scd4x_values(scd4x_values);
+
+    // send measured values over wifi to a server (to be implemented)
     
 
     // free resources, to save memory!!!
-    free(sen5x_values);
-    free(scd4x_values);
+    delete[] sen5x_values;
+    delete[] scd4x_values;
 }
