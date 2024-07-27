@@ -27,6 +27,9 @@
 #define FIRMWARE_VERSION 1
 #define SERVER_URL "http://10.10.10.253:8000/data"
 
+extern const uint8_t ca_pem_start[] asm("_binary_cert_pem_start");
+extern const uint8_t ca_pem_end[] asm("_binary_cert_pem_end");
+
 int s_retry_num = 0;
 uint8_t connected_bit = 0;
 EventGroupHandle_t s_wifi_event_group;
@@ -239,68 +242,71 @@ extern "C" void app_main(void)
         err = nvs_get_u8(nvs_str_handle, "provisioned", &nvs_result);
         // todo : implement later use of the value 
     }
-
     // init the sensirion hal so it can be used by both following functions
     sensirion_i2c_hal_init();
     // alloc memory for the arr passed after
     uint16_t* sen5x_values = new uint16_t[8];
-    int8_t return_code_sen = get_sen5x_values(sen5x_values);
-    // scd4x carbon dioxide measurement
     int32_t* scd4x_values = new int32_t[3];
-    int8_t return_code_scd = get_scd4x_values(scd4x_values);
 
-    // send measured values over wifi to a server (to be implemented)
-    int8_t conn = connect_to_wifi();
-    if(conn == ESP_OK){
-        // allocate memory for cson lib parts
-        cJSON* final_data = cJSON_CreateArray();
-        // create json objects for the values
-        cJSON* pm1p0_json = cJSON_CreateObject();
-        cJSON* pm2p5_json = cJSON_CreateObject();
-        cJSON* pm4p0_json = cJSON_CreateObject();
-        cJSON* pm10p0_json = cJSON_CreateObject();
-        cJSON* noc_json = cJSON_CreateObject();
-        cJSON* voc_json = cJSON_CreateObject();
-        cJSON* hum_json = cJSON_CreateObject();
-        cJSON* temp_json = cJSON_CreateObject();
-        cJSON* co2_json = cJSON_CreateObject();
-        // add the values to the objects
-        cJSON_AddNumberToObject(pm1p0_json , "pm1p0_json", sen5x_values[0]);
-        cJSON_AddNumberToObject(pm2p5_json , "pm2p5_json", sen5x_values[1]);
-        cJSON_AddNumberToObject(pm4p0_json , "pm4p0_json", sen5x_values[2]);
-        cJSON_AddNumberToObject(pm10p0_json, "pm10p0_json", sen5x_values[3]);
-        cJSON_AddNumberToObject(noc_json, "noc_json", sen5x_values[4]);
-        cJSON_AddNumberToObject(voc_json, "voc_json", sen5x_values[5]);
-        cJSON_AddNumberToObject(hum_json, "hum_json", sen5x_values[6]);
-        cJSON_AddNumberToObject(temp_json, "temp_json", sen5x_values[7]);
-        cJSON_AddNumberToObject(co2_json, "co2_json", scd4x_values[0]);
-        // add the single json objects to the array, so the array can be sent over wifi to server
-        cJSON_AddItemToArray(final_data,pm1p0_json );
-        cJSON_AddItemToArray(final_data,pm2p5_json );
-        cJSON_AddItemToArray(final_data,pm4p0_json );
-        cJSON_AddItemToArray(final_data,pm10p0_json);
-        cJSON_AddItemToArray(final_data,noc_json);
-        cJSON_AddItemToArray(final_data,voc_json);
-        cJSON_AddItemToArray(final_data,hum_json);
-        cJSON_AddItemToArray(final_data,temp_json);
-        cJSON_AddItemToArray(final_data,co2_json);
-        // convert to text! so it can be sent so server
-        char* json_text = cJSON_PrintUnformatted(final_data);
-        esp_http_client_config_t config = {
-            .url = SERVER_URL,
-            .auth_type = HTTP_AUTH_TYPE_BASIC,
-            // todo !!!!!!!! add server certificate !!!
-            .cert_pem = (char *)"",
-            .buffer_size_tx = 4096,
-        };
-        esp_http_client_handle_t client = esp_http_client_init(&config);
-        esp_http_client_set_method(client, HTTP_METHOD_POST);
-        esp_http_client_set_header(client, "Content-Type", "application/json");
-        esp_http_client_set_post_field(client, json_text, strlen(json_text));
-        ESP_ERROR_CHECK(esp_http_client_perform(client));
-        ESP_ERROR_CHECK(esp_http_client_cleanup(client));
+    while(1){
+        int8_t return_code_sen = get_sen5x_values(sen5x_values);
+        // scd4x carbon dioxide measurement
+        int8_t return_code_scd = get_scd4x_values(scd4x_values);
+        // send measured values over wifi to a server (to be implemented)
+        int8_t conn = connect_to_wifi();
+        if(conn == ESP_OK){
+            // allocate memory for cson lib parts
+            cJSON* final_data = cJSON_CreateArray();
+            // create json objects for the values
+            cJSON* pm1p0_json = cJSON_CreateObject();
+            cJSON* pm2p5_json = cJSON_CreateObject();
+            cJSON* pm4p0_json = cJSON_CreateObject();
+            cJSON* pm10p0_json = cJSON_CreateObject();
+            cJSON* noc_json = cJSON_CreateObject();
+            cJSON* voc_json = cJSON_CreateObject();
+            cJSON* hum_json = cJSON_CreateObject();
+            cJSON* temp_json = cJSON_CreateObject();
+            cJSON* co2_json = cJSON_CreateObject();
+            // add the values to the objects
+            cJSON_AddNumberToObject(pm1p0_json , "pm1p0_json", sen5x_values[0]);
+            cJSON_AddNumberToObject(pm2p5_json , "pm2p5_json", sen5x_values[1]);
+            cJSON_AddNumberToObject(pm4p0_json , "pm4p0_json", sen5x_values[2]);
+            cJSON_AddNumberToObject(pm10p0_json, "pm10p0_json", sen5x_values[3]);
+            cJSON_AddNumberToObject(noc_json, "noc_json", sen5x_values[4]);
+            cJSON_AddNumberToObject(voc_json, "voc_json", sen5x_values[5]);
+            cJSON_AddNumberToObject(hum_json, "hum_json", sen5x_values[6]);
+            cJSON_AddNumberToObject(temp_json, "temp_json", sen5x_values[7]);
+            cJSON_AddNumberToObject(co2_json, "co2_json", scd4x_values[0]);
+            // add the single json objects to the array, so the array can be sent over wifi to server
+            cJSON_AddItemToArray(final_data,pm1p0_json );
+            cJSON_AddItemToArray(final_data,pm2p5_json );
+            cJSON_AddItemToArray(final_data,pm4p0_json );
+            cJSON_AddItemToArray(final_data,pm10p0_json);
+            cJSON_AddItemToArray(final_data,noc_json);
+            cJSON_AddItemToArray(final_data,voc_json);
+            cJSON_AddItemToArray(final_data,hum_json);
+            cJSON_AddItemToArray(final_data,temp_json);
+            cJSON_AddItemToArray(final_data,co2_json);
+            // convert to text! so it can be sent to server
+            char* json_text = cJSON_PrintUnformatted(final_data);
+            esp_http_client_config_t config = {
+                .url = SERVER_URL,
+                .cert_pem = (char *)ca_pem_start,
+                .buffer_size_tx = 1024,
+            };
+            // prepare the esp https client (You can also use http but it has to be enabled through sdkconfig and is not secure, so I'm using https)
+            // the cert in certs/cert.pem has to be the public CA cert when visiting the server via browser, u can download it and put it into the folder
+            // otherwise -> the esp https client will crash when executing the request and the controller will be restarted!!!!
+            esp_http_client_handle_t client = esp_http_client_init(config);
+            esp_http_client_set_method(client, HTTP_METHOD_POST);
+            esp_http_client_set_header(client, "Content-Type", "application/json");
+            esp_http_client_set_post_field(client, json_text, strlen(json_text));
+            ESP_ERROR_CHECK(esp_http_client_perform(client));
+            ESP_ERROR_CHECK(esp_http_client_cleanup(client));
+        }
+        // data should be sent only twice a minute so the postgres database doesnt get too full after just a few days
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
     }
-
     // free resources, to save memory!!!
     delete[] sen5x_values;
     delete[] scd4x_values;
