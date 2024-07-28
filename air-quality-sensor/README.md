@@ -31,3 +31,6 @@ The solution should be rather cheap so other ppl can make use of this project wi
 
 ### 3D printed case
 ![Case and cover overview](esp32-case-cover.png)
+
+### Prototype (uses breadboard, no pcb)
+![Prototype](image-1.png)
