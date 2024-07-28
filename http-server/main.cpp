@@ -37,13 +37,25 @@ awaitable<void> process_client_request(tcp_socket socket){
         std::istream request_stream(&buffer);
         std::string req_line;
         std::getline(request_stream, req_line);
-
+        // create istringstream to parse the first received line (contains http method, version and path)
+        std::istringstream header_stream(req_line);
+        std::string method, uri, http_version;
+        // parse the details
+        header_stream >> method >> uri >> http_version;
+        // debug: print method, uri and http version
+        std::cout << "Method: " << method << std::endl;
+        std::cout << "URI: " << uri << std::endl;
+        std::cout << "HTTP Version: " << http_version << std::endl;
+        // start parsing the http headers sent from client
         std::string header_line;
         while(std::getline(request_stream, header_line) && header_line != "r"){
             auto colon_pos = header_line.find(':');
+            // check if current line is valid
             if (colon_pos != std::string::npos) {
+                // isolate name and value
                 std::string name = header_line.substr(0, colon_pos);
                 std::string value = header_line.substr(colon_pos + 1);
+                // remove leading and trailing space, so the stored header is valid!
                 value.erase(0, value.find_first_not_of(" \t"));
                 value.erase(value.find_last_not_of(" \t") + 1);
                 http_headers[name] = value;
@@ -53,17 +65,32 @@ awaitable<void> process_client_request(tcp_socket socket){
         for (const auto& header : http_headers) {
             std::cout << header.first << ": " << header.second << std::endl;
         }
-
         // create an instance of Response class
         std::unique_ptr<Response> resp_ptr = std::make_unique<Response>();
-
+        resp_ptr->set_status_message("OK");
+        resp_ptr->set_status_code(200);
+        resp_ptr->set_header("Content-Type","text/html");
+        std::shared_ptr<std::string> body = std::make_shared<std::string>(
+                "<title>HTTP-Server Test</title>"
+                "<header>Test!</header>"
+                "<div><h1>HTTP Server working!</h1></div>"
+                );
+        resp_ptr->set_raw_body(body);
         // craft the response!
+        std::unique_ptr<std::string> finalR = resp_ptr->get_response_string();
+        // send the response back to server
+        try {
+            std::size_t bytes_transferred = co_await boost::asio::async_write(socket,boost::asio::buffer(*finalR));
+            std::cout << "Sent " << bytes_transferred << " bytes\n";
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
         // read the requested file from the disk, append as body to response
         socket.close();
     }
     catch (std::exception& e)
     {
-        std::printf("echo Exception: %s\n", e.what());
+        std::printf("Exception: %s\n", e.what());
     }
 }
 

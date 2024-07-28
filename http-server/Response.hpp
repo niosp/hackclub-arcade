@@ -1,6 +1,6 @@
-//
-// Created by User on 28/07/2024.
-//
+/*
+ * Response class for the HTTP server: header file
+ */
 
 #ifndef HTTP_SERVER_RESPONSE_HPP
 #define HTTP_SERVER_RESPONSE_HPP

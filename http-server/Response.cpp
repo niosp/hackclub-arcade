@@ -1,6 +1,6 @@
-//
-// Created by User on 28/07/2024.
-//
+/*
+ * Response class for the HTTP server: crafts the response to be sent back to the client
+ */
 
 #include "Response.hpp"
 
