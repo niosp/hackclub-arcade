@@ -28,3 +28,6 @@ The solution should be rather cheap so other ppl can make use of this project wi
 
 ### Grafana dashboard 
 ![Grafana dashboard](image.png)
+
+### 3D printed case
+![Case and cover overview](esp32-case-cover.png)
