@@ -29,20 +29,32 @@ namespace this_coro = boost::asio::this_coro;
 awaitable<void> process_client_request(tcp_socket socket){
     try
     {
-        // parse the http headers!
-        // do post_processing!
-        std::string response =
-                "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/plain\r\n"
-                "Content-Length: 13\r\n"
-                "\r\n"
-                "Hello, world!";
-        co_await async_write(socket, boost::asio::buffer(response));
-
         // read the http headers, store them in a hashmap
         std::unordered_map<std::string, std::string> http_headers;
         boost::asio::streambuf buffer;
         std::size_t bytes_read = co_await async_read_until(socket, buffer, "\r\n\r\n", boost::asio::use_awaitable);
+        std::istream request_stream(&buffer);
+        std::string req_line;
+        std::getline(request_stream, req_line);
+
+        std::string header_line;
+        while(std::getline(request_stream, header_line) && header_line != "r"){
+            auto colon_pos = header_line.find(':');
+            if (colon_pos != std::string::npos) {
+                std::string name = header_line.substr(0, colon_pos);
+                std::string value = header_line.substr(colon_pos + 1);
+                value.erase(0, value.find_first_not_of(" \t"));
+                value.erase(value.find_last_not_of(" \t") + 1);
+                http_headers[name] = value;
+            }
+        }
+        // debug: print the header map
+        for (const auto& header : http_headers) {
+            std::cout << header.first << ": " << header.second << std::endl;
+        }
+
+        // craft the response!
+        // read the requested file from the disk, append as body to response
         socket.close();
     }
     catch (std::exception& e)
