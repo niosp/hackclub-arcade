@@ -1,5 +1,6 @@
 /*
     part of the air measurement project
+    see README.md for details on how to set up etc.
 */
 #include <stdio.h>
 #include <memory.h>
@@ -27,6 +28,8 @@
 #define FIRMWARE_VERSION 1
 #define SERVER_URL "http://10.10.10.253:8000/data"
 
+// string inside asm() varies depending on the filename of the cert file provided!
+// when modifying, also change params in the file "platformio.ini", otherwise cert cannot be compiled into final binary!
 extern const uint8_t ca_pem_start[] asm("_binary_cert_pem_start");
 extern const uint8_t ca_pem_end[] asm("_binary_cert_pem_end");
 
@@ -34,6 +37,8 @@ int s_retry_num = 0;
 uint8_t connected_bit = 0;
 EventGroupHandle_t s_wifi_event_group;
 
+// struct used within the connect_to_wifi function
+// connects then as a STATION to the wireless network
 wifi_config_t g_wifi_config = {
         .sta = {
             .ssid = "redacted",
@@ -42,7 +47,7 @@ wifi_config_t g_wifi_config = {
 };
 
 int8_t get_sen5x_values(uint16_t *arr){
-    // read some basic values ...
+    // create an variable for the error code
     int16_t error_code = 0;
     // reset device
     error_code = sen5x_device_reset();
@@ -56,9 +61,9 @@ int8_t get_sen5x_values(uint16_t *arr){
         ESP_LOGE("get_sen5x_values", "Error executing sen5x_start_measurement(): %i\n", error_code);
         return -2;
     }
-    //
     sensirion_i2c_hal_sleep_usec(1000000);
 
+    //vars to store sensor values
     uint16_t mass_concentration_pm1p0;
     uint16_t mass_concentration_pm2p5;
     uint16_t mass_concentration_pm4p0;
@@ -89,7 +94,6 @@ int8_t get_sen5x_values(uint16_t *arr){
         // measurement successful, return 0
         return 0;
     }
-
     arr[0] = mass_concentration_pm1p0;
     arr[1] = mass_concentration_pm2p5;
     arr[2] = mass_concentration_pm4p0;
@@ -297,14 +301,14 @@ extern "C" void app_main(void)
             // prepare the esp https client (You can also use http but it has to be enabled through sdkconfig and is not secure, so I'm using https)
             // the cert in certs/cert.pem has to be the public CA cert when visiting the server via browser, u can download it and put it into the folder
             // otherwise -> the esp https client will crash when executing the request and the controller will be restarted!!!!
-            esp_http_client_handle_t client = esp_http_client_init(config);
+            esp_http_client_handle_t client = esp_http_client_init(&config);
             esp_http_client_set_method(client, HTTP_METHOD_POST);
             esp_http_client_set_header(client, "Content-Type", "application/json");
             esp_http_client_set_post_field(client, json_text, strlen(json_text));
             ESP_ERROR_CHECK(esp_http_client_perform(client));
             ESP_ERROR_CHECK(esp_http_client_cleanup(client));
         }
-        // data should be sent only twice a minute so the postgres database doesnt get too full after just a few days
+        // data should be sent only twice a minute so the postgres database doesnt get too full after just a few days (would also consume more ram)
         vTaskDelay(30000 / portTICK_PERIOD_MS);
     }
     // free resources, to save memory!!!

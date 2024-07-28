@@ -118,8 +118,25 @@ void sensirion_i2c_hal_free(void) {
  * @returns 0 on success, error code otherwise
  */
 int8_t sensirion_i2c_hal_read(uint8_t address, uint8_t* data, uint16_t count) {
-    /* TODO:IMPLEMENT */
-    return NOT_IMPLEMENTED_ERROR;
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    // read data from the given address
+    i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_READ, true);
+    if (count > 1) {
+        // read data first
+        i2c_master_read(cmd, data, count - 1, I2C_MASTER_ACK);
+    }
+    // read the last byte
+    i2c_master_read_byte(cmd, data + count - 1, I2C_MASTER_NACK);
+    i2c_master_stop(cmd);
+    // execute the command
+    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(1000));
+    i2c_cmd_link_delete(cmd);
+    // return error code if command failed
+    if (ret != ESP_OK) {
+        return -1;
+    }
+    return 0;
 }
 
 /**
