@@ -14,6 +14,7 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
+#include <filesystem>
 #include "Response.hpp"
 
 using boost::asio::ip::tcp;
@@ -26,6 +27,14 @@ using tcp_acceptor = use_awaitable_t<>::as_default_on_t<tcp::acceptor>;
 using tcp_socket = use_awaitable_t<>::as_default_on_t<tcp::socket>;
 
 namespace this_coro = boost::asio::this_coro;
+
+bool is_html_file(const std::string& filename){
+    try{
+        return filename.substr(filename.length() - 5) == ".html";
+    }catch(std::out_of_range& e){
+        return false;
+    }
+}
 
 awaitable<void> process_client_request(tcp_socket socket){
     try
@@ -43,9 +52,9 @@ awaitable<void> process_client_request(tcp_socket socket){
         // parse the details
         header_stream >> method >> uri >> http_version;
         // debug: print method, uri and http version
-        std::cout << "Method: " << method << std::endl;
-        std::cout << "URI: " << uri << std::endl;
-        std::cout << "HTTP Version: " << http_version << std::endl;
+        //std::cout << "Method: " << method << std::endl;
+        //std::cout << "URI: " << uri << std::endl;
+        //std::cout << "HTTP Version: " << http_version << std::endl;
         // start parsing the http headers sent from client
         std::string header_line;
         while(std::getline(request_stream, header_line) && header_line != "r"){
@@ -62,20 +71,40 @@ awaitable<void> process_client_request(tcp_socket socket){
             }
         }
         // debug: print the header map
-        for (const auto& header : http_headers) {
+        /*
+         for (const auto& header : http_headers) {
             std::cout << header.first << ": " << header.second << std::endl;
         }
-        // create an instance of Response class
+         */
+        // create the response object
         std::unique_ptr<Response> resp_ptr = std::make_unique<Response>();
-        resp_ptr->set_status_message("OK");
-        resp_ptr->set_status_code(200);
-        resp_ptr->set_header("Content-Type","text/html");
-        std::shared_ptr<std::string> body = std::make_shared<std::string>(
-                "<title>HTTP-Server Test</title>"
-                "<header>Test!</header>"
-                "<div><h1>HTTP Server working!</h1></div>"
-                );
-        resp_ptr->set_raw_body(body);
+        // file exists on filesystem?
+        if(std::filesystem::exists("./" + uri)){
+            // send the file to the user
+            resp_ptr->set_status_message("OK");
+            resp_ptr->set_status_code(200);
+            // if it's a html file, send it as html. Otherwise, just as text/plain, so the plain
+            // file will be displayed to the user
+            std::string file_type = is_html_file("./" + uri) ? "text/html" : "text/plain";
+            resp_ptr->set_header("Content-Type",file_type);
+            // read the file
+            std::ifstream file_stream("./" + uri);
+            std::stringstream file_buffer;
+            file_buffer << file_stream.rdbuf();
+            std::shared_ptr<std::string> body = std::make_shared<std::string>(file_buffer.str());
+            resp_ptr->set_raw_body(body);
+        }else{
+            // throw 404 NOT FOUND
+            resp_ptr->set_status_message("OK");
+            resp_ptr->set_status_code(200); // if 404 is set, the browser only presents a grey generated page without the content!
+            resp_ptr->set_header("Content-Type","text/html");
+            std::shared_ptr<std::string> body = std::make_shared<std::string>(
+                    "<title>HTTP-Server - File not found</title>"
+                    "<header>Can't find the specified file</header>"
+                    "<div><h1>HTTP Server working!</h1></div>"
+            );
+            resp_ptr->set_raw_body(body);
+        }
         // craft the response!
         std::unique_ptr<std::string> finalR = resp_ptr->get_response_string();
         // send the response back to server

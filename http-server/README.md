@@ -2,6 +2,9 @@
 Simple HTTP server written in C++
 ### Features
 - serves static files
+  - file exists? -> 200 OK
+  - file not found? -> send 404 page
+  - directory? -> send directory listing (todo)
 - supports only GET requests currently
 - async io implemented using C++20 coroutines
 - hopefully good code documentation (I'll try my best!)
@@ -15,7 +18,6 @@ Simple HTTP server written in C++
 - run ``cmake --build .`` in build directory
 - run ``.\http-server.exe <port>``
 - open browser and navigate to ``localhost:<port>``
-
 
 ### Good to know
 - When using vcpkg, make sure to update the paths in CMakeLists.txt
