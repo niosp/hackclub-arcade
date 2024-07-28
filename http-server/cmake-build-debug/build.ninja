@@ -56,6 +56,13 @@ build CMakeFiles/http_server.dir/main.cpp.obj: CXX_COMPILER__http_server_unscann
   OBJECT_DIR = CMakeFiles\http_server.dir
   OBJECT_FILE_DIR = CMakeFiles\http_server.dir
 
+build CMakeFiles/http_server.dir/Response.cpp.obj: CXX_COMPILER__http_server_unscanned_Debug C$:/Users/User/Desktop/hackclub-arcade/http-server/Response.cpp || cmake_object_order_depends_target_http_server
+  DEP_FILE = CMakeFiles\http_server.dir\Response.cpp.obj.d
+  FLAGS = -g -std=gnu++23 -fdiagnostics-color=always
+  INCLUDES = -isystem C:/Users/User/Downloads/vcpkg/installed/x64-windows/include
+  OBJECT_DIR = CMakeFiles\http_server.dir
+  OBJECT_FILE_DIR = CMakeFiles\http_server.dir
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target http_server
@@ -64,7 +71,7 @@ build CMakeFiles/http_server.dir/main.cpp.obj: CXX_COMPILER__http_server_unscann
 #############################################
 # Link the executable http_server.exe
 
-build http_server.exe: CXX_EXECUTABLE_LINKER__http_server_Debug CMakeFiles/http_server.dir/main.cpp.obj | C$:/Users/User/Downloads/vcpkg/installed/x64-windows/lib/boost_system-vc140-mt.lib
+build http_server.exe: CXX_EXECUTABLE_LINKER__http_server_Debug CMakeFiles/http_server.dir/main.cpp.obj CMakeFiles/http_server.dir/Response.cpp.obj | C$:/Users/User/Downloads/vcpkg/installed/x64-windows/lib/boost_system-vc140-mt.lib
   FLAGS = -g
   LINK_LIBRARIES = C:/Users/User/Downloads/vcpkg/installed/x64-windows/lib/boost_system-vc140-mt.lib  -lws2_32  -lwsock32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\http_server.dir

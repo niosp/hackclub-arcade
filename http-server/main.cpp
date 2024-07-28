@@ -14,6 +14,7 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
+#include "Response.hpp"
 
 using boost::asio::ip::tcp;
 using boost::asio::awaitable;
@@ -52,6 +53,9 @@ awaitable<void> process_client_request(tcp_socket socket){
         for (const auto& header : http_headers) {
             std::cout << header.first << ": " << header.second << std::endl;
         }
+
+        // create an instance of Response class
+        std::unique_ptr<Response> resp_ptr = std::make_unique<Response>();
 
         // craft the response!
         // read the requested file from the disk, append as body to response
