@@ -2,5 +2,21 @@
     <qresource prefix="/">
         <file>icons/search.svg</file>
         <file>icons/file_open.svg</file>
+        <file>icons/copy.svg</file>
+        <file>icons/cut.svg</file>
+        <file>icons/delete.svg</file>
+        <file>icons/exit.svg</file>
+        <file>icons/find_replace.svg</file>
+        <file>icons/go_to.svg</file>
+        <file>icons/paste.svg</file>
+        <file>icons/redo.svg</file>
+        <file>icons/save.svg</file>
+        <file>icons/save_as.svg</file>
+        <file>icons/select all.svg</file>
+        <file>icons/time_date.svg</file>
+        <file>icons/undo.svg</file>
+        <file>icons/zoom_in.svg</file>
+        <file>icons/zoom_out.svg</file>
+        <file>icons/replace.svg</file>
     </qresource>
 </RCC>
