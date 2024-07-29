@@ -24,7 +24,7 @@
     <item>
      <widget class="QPlainTextEdit" name="plainTextEdit">
       <property name="plainText">
-       <string>dfghdfghd</string>
+       <string/>
       </property>
      </widget>
     </item>

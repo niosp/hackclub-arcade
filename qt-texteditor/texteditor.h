@@ -31,6 +31,12 @@ private slots:
 
     void on_actionZoom_out_triggered();
 
+    void on_plainTextEdit_cursorPositionChanged();
+
+    void find_string(QString s, bool reverse, bool casesens, bool words);
+
+    void on_actionFind_triggered();
+
 private:
     Ui::TextEditor *ui;
     QString currentFile;

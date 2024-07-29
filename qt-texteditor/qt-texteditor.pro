@@ -10,12 +10,15 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
+    searchdialog.cpp \
     texteditor.cpp
 
 HEADERS += \
+    searchdialog.h \
     texteditor.h
 
 FORMS += \
+    searchdialog.ui \
     texteditor.ui
 
 # Default rules for deployment.

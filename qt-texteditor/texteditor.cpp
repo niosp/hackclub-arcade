@@ -1,5 +1,6 @@
 #include "texteditor.h"
 #include "ui_texteditor.h"
+#include "searchdialog.h"
 
 #include <QFileDialog>
 #include <QStandardPaths>
@@ -122,5 +123,51 @@ void TextEditor::on_actionZoom_out_triggered()
 {
     qDebug() << "zoom out called";
     ui->plainTextEdit->zoomOut(2);
+}
+
+void TextEditor::find_string(QString s, bool reverse, bool casesens, bool words)
+{
+    QTextDocument::FindFlags flag;
+    if (reverse) flag |= QTextDocument::FindBackward;
+    if (casesens) flag |= QTextDocument::FindCaseSensitively;
+    if (words) flag |= QTextDocument::FindWholeWords;
+
+    QTextCursor cursor = ui->plainTextEdit->textCursor();
+    QTextCursor cursor_saved = cursor;
+
+    if (!ui->plainTextEdit->find(s, flag))
+    {
+        cursor.movePosition(reverse?QTextCursor::End:QTextCursor::Start);
+        ui->plainTextEdit->setTextCursor(cursor);
+        if (!ui->plainTextEdit->find(s, flag))
+        {
+            //no match in whole document, use the old cursor!
+            QMessageBox msgBox;
+            msgBox.setText(tr("String not found."));
+            msgBox.setStandardButtons(QMessageBox::Ok);
+            msgBox.setDefaultButton(QMessageBox::Ok);
+            msgBox.exec();
+            ui->plainTextEdit->setTextCursor(cursor_saved);
+        }
+    }else{
+
+    }
+}
+
+
+void TextEditor::on_plainTextEdit_cursorPositionChanged()
+{
+    // update cursor position
+    QTextCursor text_cursor = ui->plainTextEdit->textCursor();
+    this->m_statusMiddle->setText("Line: " + QString::number(text_cursor.blockNumber()) + " Column: " + QString::number(text_cursor.columnNumber()));
+}
+
+
+void TextEditor::on_actionFind_triggered()
+{
+    SearchDialog sd;
+    sd.show();
+    sd.exec();
+
 }
 
