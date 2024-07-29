@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>792</width>
+    <height>693</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,7 +22,11 @@
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
-     <widget class="QTextEdit" name="textEdit"/>
+     <widget class="QPlainTextEdit" name="plainTextEdit">
+      <property name="plainText">
+       <string>dfghdfghd</string>
+      </property>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -31,7 +35,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>792</width>
      <height>21</height>
     </rect>
    </property>
@@ -76,18 +80,7 @@
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QToolBar" name="toolBar">
-   <property name="windowTitle">
-    <string>toolBar</string>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>BottomToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
   <action name="actionOpen_File">
    <property name="icon">
     <iconset resource="icons.qrc">
