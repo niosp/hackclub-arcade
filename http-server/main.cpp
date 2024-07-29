@@ -30,14 +30,6 @@ using tcp_socket = use_awaitable_t<>::as_default_on_t<tcp::socket>;
 
 namespace this_coro = boost::asio::this_coro;
 
-bool is_html_file(const std::string& filename){
-    try{
-        return filename.substr(filename.length() - 5) == ".html";
-    }catch(std::out_of_range& e){
-        return false;
-    }
-}
-
 awaitable<void> process_client_request(tcp_socket socket){
     try
     {
@@ -54,7 +46,7 @@ awaitable<void> process_client_request(tcp_socket socket){
         // parse the details
         header_stream >> method >> uri >> http_version;
         // debug: print method, uri and http version
-        std::printf("%s %s %s\n", method.c_str(), uri.c_str(), http_version.c_str());
+        std::printf("%s: %s %s %s\n", get_current_timestamp().c_str(), method.c_str(), uri.c_str(), http_version.c_str());
         // start parsing the http headers sent from client
         std::string header_line;
         while(std::getline(request_stream, header_line) && header_line != "r"){
@@ -70,25 +62,24 @@ awaitable<void> process_client_request(tcp_socket socket){
                 http_headers[name] = value;
             }
         }
-        // debug: print the header map
-        /*
-         for (const auto& header : http_headers) {
-            std::cout << header.first << ": " << header.second << std::endl;
-        }
-         */
         // create the response object
         std::unique_ptr<Response> resp_ptr = std::make_unique<Response>();
         resp_ptr->set_status_message("OK");
         resp_ptr->set_status_code(200);
         // file exists on filesystem?
-        if(std::filesystem::exists("./" + uri) && !std::filesystem::is_directory("./" + uri)){
+        // reserved endpoint!
+        if(uri == "/system"){
+            resp_ptr->set_header("Content-Type","text/html");
+            std::shared_ptr<std::string> body = ResponseTypes::generate_system_info();
+            resp_ptr->set_raw_body(body);
+        }else if(std::filesystem::exists("./" + uri) && !std::filesystem::is_directory("./" + uri)){
             // send the file to the user
             // if it's a html file, send it as html. Otherwise, just as text/plain, so the plain
             // file will be displayed to the user
             std::string file_type = is_html_file("./" + uri) ? "text/html" : "text/plain";
             resp_ptr->set_header("Content-Type",file_type);
             // read the file
-            std::unique_ptr<std::string> body = read_file_from_disk("./" + uri);
+            std::unique_ptr<std::string> body = read_file_from_disk("." + uri);
             resp_ptr->set_raw_body(std::move(body));
         }else if(std::filesystem::is_directory("./" + uri) && std::filesystem::exists("./" + uri)){
             // if the requested path is a directory, list the files in the directory so the user can click through dirs
@@ -106,7 +97,6 @@ awaitable<void> process_client_request(tcp_socket socket){
         // send the response back to server
         try {
             std::size_t bytes_transferred = co_await boost::asio::async_write(socket,boost::asio::buffer(*finalR));
-            // std::cout << "Sent " << bytes_transferred << " bytes\n";
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
         }
