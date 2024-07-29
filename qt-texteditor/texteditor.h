@@ -23,6 +23,14 @@ private slots:
 
     void on_plainTextEdit_textChanged();
 
+    void on_actionExit_triggered();
+
+    void on_actionSave_As_triggered();
+
+    void on_actionZoom_in_triggered();
+
+    void on_actionZoom_out_triggered();
+
 private:
     Ui::TextEditor *ui;
     QString currentFile;

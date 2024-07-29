@@ -2,6 +2,7 @@
 #include "ui_texteditor.h"
 
 #include <QFileDialog>
+#include <QStandardPaths>
 #include <QMessageBox>
 #include <QTimer>
 
@@ -23,13 +24,13 @@ TextEditor::TextEditor(QWidget *parent)
     statusBar()->addPermanentWidget(m_statusLeft, 90);
     statusBar()->addPermanentWidget(m_statusMiddle, 20);
     statusBar()->addPermanentWidget(m_statusRight, 5);
+    ui->actionZoom_in->setShortcut(Qt::Key_Plus | Qt::CTRL);
 }
 
 TextEditor::~TextEditor()
 {
     delete ui;
 }
-
 
 void TextEditor::on_actionOpen_File_triggered()
 {
@@ -57,27 +58,69 @@ void TextEditor::on_actionOpen_File_triggered()
 // "Save" button in toolbar triggered
 void TextEditor::on_actionSave_triggered()
 {
-    if(textChanged){
+    if(textChanged && currentFile != nullptr){
+        QFile file(this->currentFile);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            qWarning("Could not open file for writing.");
+            return;
+        }
+        QTextStream out(&file);
+        out << ui->plainTextEdit->toPlainText();
+        file.close();
         QTimer::singleShot(0, [=](){
-            this->m_statusLeft->setText("Saved file" + this->currentFile);
+            this->m_statusLeft->setText("Saved file: " + this->currentFile);
             QTimer::singleShot(4000, [=](){
                 this->m_statusLeft->setText("");
             });
         });
         this->textChanged = false;
-    }else{
+    }else if(!textChanged && currentFile != nullptr){
         QTimer::singleShot(0, [=](){
             this->m_statusLeft->setText("File already saved");
             QTimer::singleShot(4000, [=](){
                 this->m_statusLeft->setText("");
             });
         });
+    }else{
+        // trigger save as
+        TextEditor::on_actionSave_As_triggered();
     }
 }
 
-// text in TextEdit changed
 void TextEditor::on_plainTextEdit_textChanged()
 {
     this->textChanged = true;
+}
+
+
+void TextEditor::on_actionExit_triggered()
+{
+    QApplication::quit();
+}
+
+
+void TextEditor::on_actionSave_As_triggered()
+{
+    QString userDirectory = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        tr("Save File"),
+        userDirectory,
+        tr("Text Files (*.txt);;All Files (*)")
+    );
+}
+
+
+void TextEditor::on_actionZoom_in_triggered()
+{
+    qDebug() << "zoom in called";
+    ui->plainTextEdit->zoomIn(2);
+}
+
+
+void TextEditor::on_actionZoom_out_triggered()
+{
+    qDebug() << "zoom out called";
+    ui->plainTextEdit->zoomOut(2);
 }
 
