@@ -16,6 +16,7 @@
 #include <iostream>
 #include <filesystem>
 #include "Response.hpp"
+#include "ResponseTypes.hpp"
 
 using boost::asio::ip::tcp;
 using boost::asio::awaitable;
@@ -94,64 +95,12 @@ awaitable<void> process_client_request(tcp_socket socket){
         }else if(std::filesystem::is_directory("./" + uri) && std::filesystem::exists("./" + uri)){
             // if the requested path is a directory, list the files in the directory so the user can click through dirs
             resp_ptr->set_header("Content-Type","text/html");
-            std::shared_ptr<std::string> body = std::make_shared<std::string>();
-            *body += "<!DOCTYPE html>\n";
-            *body += "<html>\n";
-            *body += "<head>\n";
-            *body += "    <title>Directory Listing</title>\n";
-            *body += "    <style>\n";
-            *body += "        body { font-family: Arial, sans-serif; }\n";
-            *body += "        table { width: 100%; border-collapse: collapse; }\n";
-            *body += "        th, td { border: 1px solid #ddd; padding: 8px; }\n";
-            *body += "        th { background-color: #f2f2f2; }\n";
-            *body += "    </style>\n";
-            *body += "</head>\n";
-            *body += "<body>\n";
-            *body += "    <h1>Directory Listing for ";
-            *body += "." + uri;
-            *body += "</h1>\n";
-            *body += "    <table>\n";
-            *body += "        <tr>\n";
-            *body += "            <th>Name</th>\n";
-            *body += "            <th>Type</th>\n";
-            *body += "            <th>Size (bytes)</th>\n";
-            *body += "        </tr>\n";
-            *body += "        <tr>\n";
-            *body += "            <td><a href=\"../\">Go back</a></td>\n";
-            *body += "        </tr>\n";
-            // iterate over the directory entries, add them to the table
-            for (const auto& entry : std::filesystem::directory_iterator("." + uri)) {
-                std::string name = entry.path().filename().string();
-                std::string type = std::filesystem::is_directory(entry.status()) ? "Directory" : "File";
-                std::uintmax_t size = std::filesystem::is_regular_file(entry.status()) ? std::filesystem::file_size(entry.path()) : 0;
-                *body += "        <tr>\n";
-                *body += "              <td><a href=\"";
-                if(std::filesystem::is_directory(entry.status())){
-                    *body += name + "/";
-                }else{
-                    *body += name;
-                }
-                *body += "\">";
-                *body += name;
-                *body += "</a></td>\n";
-                *body += "            <td>" + type + "</td>\n";
-                *body += "            <td>";
-                *body += std::to_string(size);
-                *body += "</td>\n";
-                *body += "        </tr>\n";
-            }
-            *body += "    </table>\n";
-            *body += "</body>\n";
-            *body += "</html>\n";
+            std::shared_ptr<std::string> body = ResponseTypes::generate_directory_listing(uri);
             resp_ptr->set_raw_body(body);
         }else{
             // throw 404 NOT FOUND
             resp_ptr->set_header("Content-Type","text/html");
-            std::shared_ptr<std::string> body = std::make_shared<std::string>(
-                    "<title>HTTP-Server - File not found</title>"
-                    "<header>Can't find the specified file</header>"
-                    "<div><h1>HTTP Server working!</h1></div>"
-            );
+            std::shared_ptr<std::string> body = ResponseTypes::generate_404_not_found(uri);
             resp_ptr->set_raw_body(body);
         }
         // craft the response!

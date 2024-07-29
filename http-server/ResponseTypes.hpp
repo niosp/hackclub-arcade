@@ -11,8 +11,9 @@
 class ResponseTypes {
     ResponseTypes();
     ~ResponseTypes();
-    std::unique_ptr<std::string> generate_directory_listing(const std::string& path);
-    std::unique_ptr<std::string> generate_404_not_found(const std::string& path);
+public:
+    static std::shared_ptr<std::string> generate_directory_listing(const std::string& path);
+    static std::shared_ptr<std::string> generate_404_not_found(const std::string& path);
 };
 
 

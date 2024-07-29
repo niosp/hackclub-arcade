@@ -1,3 +1,0 @@
-C:/Users/User/Desktop/hackclub-arcade/http-server/cmake-build-release/CMakeFiles/http_server.dir
-C:/Users/User/Desktop/hackclub-arcade/http-server/cmake-build-release/CMakeFiles/edit_cache.dir
-C:/Users/User/Desktop/hackclub-arcade/http-server/cmake-build-release/CMakeFiles/rebuild_cache.dir

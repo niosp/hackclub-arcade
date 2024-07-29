@@ -10,7 +10,8 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} "C:/Users/User/Downloads/vcpkg/inst
 add_executable(http_server main.cpp
         Response.cpp
         ResponseTypes.hpp
-        ResponseTypes.cpp)
+        ResponseTypes.cpp
+        util.hpp)
 
 find_package(Boost REQUIRED COMPONENTS system)
 target_link_libraries(http_server PRIVATE Boost::system)
