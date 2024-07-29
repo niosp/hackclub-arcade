@@ -61,7 +61,7 @@ std::shared_ptr<std::string> ResponseTypes::generate_directory_listing(const std
 }
 
 std::shared_ptr<std::string> ResponseTypes::generate_404_not_found(const std::string &path) {
-    std::unique_ptr<std::string> not_found_ptr = read_file_from_disk("404.html");
+    std::unique_ptr<std::string> not_found_ptr = read_file_from_disk("../templates/404.html");
     if(not_found_ptr){
         return std::make_shared<std::string>(*not_found_ptr);
     }else{

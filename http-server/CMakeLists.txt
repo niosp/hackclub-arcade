@@ -11,7 +11,8 @@ add_executable(http_server main.cpp
         Response.cpp
         ResponseTypes.hpp
         ResponseTypes.cpp
-        util.hpp)
+        util.hpp
+        util.cpp)
 
 find_package(Boost REQUIRED COMPONENTS system)
 target_link_libraries(http_server PRIVATE Boost::system)

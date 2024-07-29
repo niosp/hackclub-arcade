@@ -5,6 +5,7 @@
 #include "Response.hpp"
 
 #include <utility>
+#include <iostream>
 
 Response::Response() {
     this->raw_body = std::make_shared<std::string>();
@@ -21,6 +22,9 @@ std::unique_ptr<std::string> Response::craft_response() {
     std::unique_ptr<std::string> response = std::make_unique<std::string>();
     // append the status line
     *response += "HTTP/1.1 " + std::to_string(this->status_code) + " " + this->status_message + "\r\n";
+    // calculate the content length
+    this->set_content_length(this->raw_body->size());
+    std::cout << "Content-Length: " << this->get_content_length() << std::endl;
     // append the headers
     for (const auto& header : this->headers) {
         *response += header.first + ": " + header.second + "\r\n";

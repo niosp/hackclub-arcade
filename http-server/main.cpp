@@ -17,6 +17,7 @@
 #include <filesystem>
 #include "Response.hpp"
 #include "ResponseTypes.hpp"
+#include "util.hpp"
 
 using boost::asio::ip::tcp;
 using boost::asio::awaitable;
@@ -87,11 +88,8 @@ awaitable<void> process_client_request(tcp_socket socket){
             std::string file_type = is_html_file("./" + uri) ? "text/html" : "text/plain";
             resp_ptr->set_header("Content-Type",file_type);
             // read the file
-            std::ifstream file_stream("./" + uri);
-            std::stringstream file_buffer;
-            file_buffer << file_stream.rdbuf();
-            std::shared_ptr<std::string> body = std::make_shared<std::string>(file_buffer.str());
-            resp_ptr->set_raw_body(body);
+            std::unique_ptr<std::string> body = read_file_from_disk("./" + uri);
+            resp_ptr->set_raw_body(std::move(body));
         }else if(std::filesystem::is_directory("./" + uri) && std::filesystem::exists("./" + uri)){
             // if the requested path is a directory, list the files in the directory so the user can click through dirs
             resp_ptr->set_header("Content-Type","text/html");
