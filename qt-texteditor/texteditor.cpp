@@ -1,6 +1,7 @@
 #include "texteditor.h"
 #include "ui_texteditor.h"
 #include "searchdialog.h"
+#include "replacedialog.h"
 
 #include <QFileDialog>
 #include <QStandardPaths>
@@ -26,6 +27,7 @@ TextEditor::TextEditor(QWidget *parent)
     statusBar()->addPermanentWidget(m_statusMiddle, 20);
     statusBar()->addPermanentWidget(m_statusRight, 5);
     ui->actionZoom_in->setShortcut(Qt::Key_Plus | Qt::CTRL);
+    ui->plainTextEdit->setUndoRedoEnabled(true);
 }
 
 TextEditor::~TextEditor()
@@ -109,6 +111,21 @@ void TextEditor::on_actionSave_As_triggered()
         userDirectory,
         tr("Text Files (*.txt);;All Files (*)")
     );
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning("Could not open file for writing.");
+        return;
+    }
+    QTextStream out(&file);
+    out << ui->plainTextEdit->toPlainText();
+    file.close();
+    this->currentFile = fileName;
+    QTimer::singleShot(0, [=](){
+        this->m_statusLeft->setText("Created and saved file: " + this->currentFile);
+        QTimer::singleShot(4000, [=](){
+            this->m_statusLeft->setText("");
+        });
+    });
 }
 
 
@@ -165,9 +182,38 @@ void TextEditor::on_plainTextEdit_cursorPositionChanged()
 
 void TextEditor::on_actionFind_triggered()
 {
-    SearchDialog sd;
+    SearchDialog sd(ui->plainTextEdit);
     sd.show();
     sd.exec();
+}
 
+
+void TextEditor::on_actionUndo_triggered()
+{
+}
+
+
+void TextEditor::on_actionRedo_triggered()
+{
+}
+
+
+void TextEditor::on_actionSelect_all_triggered()
+{
+    this->ui->plainTextEdit->selectAll();
+}
+
+
+void TextEditor::on_actionCut_triggered()
+{
+    this->ui->plainTextEdit->cut();
+}
+
+
+void TextEditor::on_actionReplace_triggered()
+{
+    ReplaceDialog rp(ui->plainTextEdit);
+    rp.show();
+    rp.exec();
 }
 

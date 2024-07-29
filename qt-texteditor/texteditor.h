@@ -37,6 +37,16 @@ private slots:
 
     void on_actionFind_triggered();
 
+    void on_actionUndo_triggered();
+
+    void on_actionRedo_triggered();
+
+    void on_actionSelect_all_triggered();
+
+    void on_actionCut_triggered();
+
+    void on_actionReplace_triggered();
+
 private:
     Ui::TextEditor *ui;
     QString currentFile;

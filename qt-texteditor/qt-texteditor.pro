@@ -10,14 +10,17 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
+    replacedialog.cpp \
     searchdialog.cpp \
     texteditor.cpp
 
 HEADERS += \
+    replacedialog.h \
     searchdialog.h \
     texteditor.h
 
 FORMS += \
+    replacedialog.ui \
     searchdialog.ui \
     texteditor.ui
 

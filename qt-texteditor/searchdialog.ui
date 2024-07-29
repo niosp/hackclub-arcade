@@ -68,7 +68,7 @@
     <string>Search</string>
    </property>
   </widget>
-  <widget class="QCheckBox" name="checkBox">
+  <widget class="QCheckBox" name="backward_chk">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -81,7 +81,7 @@
     <string>Backward</string>
    </property>
   </widget>
-  <widget class="QCheckBox" name="checkBox_2">
+  <widget class="QCheckBox" name="case_sen_chk">
    <property name="geometry">
     <rect>
      <x>90</x>
@@ -94,7 +94,7 @@
     <string>Case-sensitive</string>
    </property>
   </widget>
-  <widget class="QCheckBox" name="checkBox_3">
+  <widget class="QCheckBox" name="whole_words_chk">
    <property name="geometry">
     <rect>
      <x>190</x>

@@ -16,8 +16,14 @@ public:
     SearchDialog(QPlainTextEdit *parent = nullptr);
     ~SearchDialog();
 
+private slots:
+    void on_pushButton_2_clicked();
+
+    void on_pushButton_clicked();
+
 private:
     Ui::SearchDialog *ui;
+    QPlainTextEdit *edit;
 };
 
 #endif // SEARCHDIALOG_H
