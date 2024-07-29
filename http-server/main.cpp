@@ -52,9 +52,7 @@ awaitable<void> process_client_request(tcp_socket socket){
         // parse the details
         header_stream >> method >> uri >> http_version;
         // debug: print method, uri and http version
-        //std::cout << "Method: " << method << std::endl;
-        //std::cout << "URI: " << uri << std::endl;
-        //std::cout << "HTTP Version: " << http_version << std::endl;
+        std::printf("%s %s %s\n", method.c_str(), uri.c_str(), http_version.c_str());
         // start parsing the http headers sent from client
         std::string header_line;
         while(std::getline(request_stream, header_line) && header_line != "r"){
@@ -78,11 +76,11 @@ awaitable<void> process_client_request(tcp_socket socket){
          */
         // create the response object
         std::unique_ptr<Response> resp_ptr = std::make_unique<Response>();
+        resp_ptr->set_status_message("OK");
+        resp_ptr->set_status_code(200);
         // file exists on filesystem?
-        if(std::filesystem::exists("./" + uri)){
+        if(std::filesystem::exists("./" + uri) && !std::filesystem::is_directory("./" + uri)){
             // send the file to the user
-            resp_ptr->set_status_message("OK");
-            resp_ptr->set_status_code(200);
             // if it's a html file, send it as html. Otherwise, just as text/plain, so the plain
             // file will be displayed to the user
             std::string file_type = is_html_file("./" + uri) ? "text/html" : "text/plain";
@@ -93,10 +91,61 @@ awaitable<void> process_client_request(tcp_socket socket){
             file_buffer << file_stream.rdbuf();
             std::shared_ptr<std::string> body = std::make_shared<std::string>(file_buffer.str());
             resp_ptr->set_raw_body(body);
+        }else if(std::filesystem::is_directory("./" + uri) && std::filesystem::exists("./" + uri)){
+            // if the requested path is a directory, list the files in the directory so the user can click through dirs
+            resp_ptr->set_header("Content-Type","text/html");
+            std::shared_ptr<std::string> body = std::make_shared<std::string>();
+            *body += "<!DOCTYPE html>\n";
+            *body += "<html>\n";
+            *body += "<head>\n";
+            *body += "    <title>Directory Listing</title>\n";
+            *body += "    <style>\n";
+            *body += "        body { font-family: Arial, sans-serif; }\n";
+            *body += "        table { width: 100%; border-collapse: collapse; }\n";
+            *body += "        th, td { border: 1px solid #ddd; padding: 8px; }\n";
+            *body += "        th { background-color: #f2f2f2; }\n";
+            *body += "    </style>\n";
+            *body += "</head>\n";
+            *body += "<body>\n";
+            *body += "    <h1>Directory Listing for ";
+            *body += "." + uri;
+            *body += "</h1>\n";
+            *body += "    <table>\n";
+            *body += "        <tr>\n";
+            *body += "            <th>Name</th>\n";
+            *body += "            <th>Type</th>\n";
+            *body += "            <th>Size (bytes)</th>\n";
+            *body += "        </tr>\n";
+            *body += "        <tr>\n";
+            *body += "            <td><a href=\"../\">Go back</a></td>\n";
+            *body += "        </tr>\n";
+            // iterate over the directory entries, add them to the table
+            for (const auto& entry : std::filesystem::directory_iterator("." + uri)) {
+                std::string name = entry.path().filename().string();
+                std::string type = std::filesystem::is_directory(entry.status()) ? "Directory" : "File";
+                std::uintmax_t size = std::filesystem::is_regular_file(entry.status()) ? std::filesystem::file_size(entry.path()) : 0;
+                *body += "        <tr>\n";
+                *body += "              <td><a href=\"";
+                if(std::filesystem::is_directory(entry.status())){
+                    *body += name + "/";
+                }else{
+                    *body += name;
+                }
+                *body += "\">";
+                *body += name;
+                *body += "</a></td>\n";
+                *body += "            <td>" + type + "</td>\n";
+                *body += "            <td>";
+                *body += std::to_string(size);
+                *body += "</td>\n";
+                *body += "        </tr>\n";
+            }
+            *body += "    </table>\n";
+            *body += "</body>\n";
+            *body += "</html>\n";
+            resp_ptr->set_raw_body(body);
         }else{
             // throw 404 NOT FOUND
-            resp_ptr->set_status_message("OK");
-            resp_ptr->set_status_code(200); // if 404 is set, the browser only presents a grey generated page without the content!
             resp_ptr->set_header("Content-Type","text/html");
             std::shared_ptr<std::string> body = std::make_shared<std::string>(
                     "<title>HTTP-Server - File not found</title>"
@@ -110,7 +159,7 @@ awaitable<void> process_client_request(tcp_socket socket){
         // send the response back to server
         try {
             std::size_t bytes_transferred = co_await boost::asio::async_write(socket,boost::asio::buffer(*finalR));
-            std::cout << "Sent " << bytes_transferred << " bytes\n";
+            // std::cout << "Sent " << bytes_transferred << " bytes\n";
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
         }

@@ -8,7 +8,9 @@ SET(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} "C:/Users/User/Downloads/vcpkg/inst
 SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} "C:/Users/User/Downloads/vcpkg/installed/x64-windows/bin")
 
 add_executable(http_server main.cpp
-        Response.cpp)
+        Response.cpp
+        ResponseTypes.hpp
+        ResponseTypes.cpp)
 
 find_package(Boost REQUIRED COMPONENTS system)
 target_link_libraries(http_server PRIVATE Boost::system)
