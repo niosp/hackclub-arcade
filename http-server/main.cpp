@@ -17,6 +17,7 @@
 #include <filesystem>
 #include "Response.hpp"
 #include "ResponseTypes.hpp"
+#include "ServerStats.hpp"
 #include "util.hpp"
 
 using boost::asio::ip::tcp;
@@ -28,11 +29,15 @@ using boost::asio::use_awaitable_t;
 using tcp_acceptor = use_awaitable_t<>::as_default_on_t<tcp::acceptor>;
 using tcp_socket = use_awaitable_t<>::as_default_on_t<tcp::socket>;
 
+std::shared_ptr<ServerStats> stats;
+
 namespace this_coro = boost::asio::this_coro;
 
 awaitable<void> process_client_request(tcp_socket socket){
     try
     {
+        // increase the total requests counter
+        stats->increase_total_requests();
         // read the http headers, store them in a hashmap
         std::unordered_map<std::string, std::string> http_headers;
         boost::asio::streambuf buffer;
@@ -69,8 +74,8 @@ awaitable<void> process_client_request(tcp_socket socket){
         // file exists on filesystem?
         // reserved endpoint!
         if(uri == "/system"){
-            resp_ptr->set_header("Content-Type","text/html");
-            std::shared_ptr<std::string> body = ResponseTypes::generate_system_info();
+            resp_ptr->set_header("Content-Type","application/json");
+            std::shared_ptr<std::string> body = std::make_shared<std::string>(stats->get_stats_as_json());
             resp_ptr->set_raw_body(body);
         }else if(std::filesystem::exists("./" + uri) && !std::filesystem::is_directory("./" + uri)){
             // send the file to the user
@@ -109,13 +114,18 @@ awaitable<void> process_client_request(tcp_socket socket){
     }
 }
 
-awaitable<void> processor(int port){
+awaitable<void> processor(int port, const std::string& bind_on){
     // create the executor
     auto executor = co_await this_coro::executor;
     // create the tcp acceptor that listens on the port (1st func arg)
-    tcp_acceptor acceptor(executor, {tcp::v4(), static_cast<boost::asio::ip::port_type>(port)});
+    tcp_acceptor acceptor(executor, {boost::asio::ip::make_address(bind_on), static_cast<boost::asio::ip::port_type>(port)});
     // accept tcp connections from clients
     std::printf("Server running on port %d\n", port);
+    // init shared_pointer to server stats object
+    stats = std::make_shared<ServerStats>();
+    stats->set_port(port);
+    stats->set_bind_on(bind_on);
+    // loop forever, accept incoming connections
     for (;;)
     {
         // accept the connection, move the socket inside the coroutine
@@ -125,8 +135,8 @@ awaitable<void> processor(int port){
 }
 int main(int argc, char* argv[]) {
     // port should be supplied as argument (argv[1])
-    if(argc <= 1){
-        std::cerr << "Usage: ./<server_binary> <port>\n";
+    if(argc <= 2){
+        std::cerr << "Usage: ./<server_binary> <port> <bind_address>\n";
         return 0;
     }
     try{
@@ -135,7 +145,7 @@ int main(int argc, char* argv[]) {
         boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
         signals.async_wait([&](auto, auto){ io_context.stop(); });
         // spawn a coroutine that handles incoming tcp connections, pass the port
-        co_spawn(io_context, processor(std::stoi(argv[1])), detached);
+        co_spawn(io_context, processor(std::stoi(argv[1]), argv[2]), detached);
         // run the io_context!
         io_context.run();
     }catch(std::exception& ex){

@@ -23,7 +23,11 @@ std::string get_current_timestamp() {
     // get current time, result will look like this: Mon Jul 29 16:42:04 2024
     auto now = std::chrono::system_clock::now();
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    return std::ctime(&now_c);
+    std::string timestamp = std::ctime(&now_c);
+    if (!timestamp.empty() && timestamp.back() == '\n') {
+        timestamp.pop_back();
+    }
+    return timestamp;
 }
 
 bool is_html_file(const std::string& filename){
