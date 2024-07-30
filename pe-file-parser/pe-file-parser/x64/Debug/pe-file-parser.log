@@ -1,16 +1,16 @@
 ﻿  pe-file-parser.cpp
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(32,17): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'std::streamsize'
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(32,17):
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(13,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(46,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(79,17): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'std::streamsize'
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(79,17):
   consider using '%lld' in the format string
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(32,17):
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(79,17):
   consider using '%Id' in the format string
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(32,17):
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(79,17):
   consider using '%I64d' in the format string
   
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(175,17): warning C4477: 'printf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'DWORD'
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(175,17): warning C4313: 'printf': '%s' in format string conflicts with argument 1 of type 'DWORD'
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(210,42): warning C4474: 'printf' : too many arguments passed for format string
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(210,42):
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(227,40): warning C4474: 'printf' : too many arguments passed for format string
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(227,40):
   placeholders and their parameters expect 7 variadic arguments, but 8 were provided
   
   pe-file-parser.vcxproj -> C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\x64\Debug\pe-file-parser.exe

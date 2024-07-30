@@ -6,6 +6,39 @@
 #include <cstdint>
 #include <vector>
 
+int locate(DWORD VA, PIMAGE_SECTION_HEADER sectionHeaders, DWORD numberOfHeaders) {
+
+    int index;
+
+    for (int i = 0; i < numberOfHeaders; i++) {
+        if (VA >= sectionHeaders[i].VirtualAddress
+            && VA < (sectionHeaders[i].VirtualAddress + sectionHeaders[i].Misc.VirtualSize)) {
+            index = i;
+            break;
+        }
+    }
+    return index;
+}
+
+DWORD resolve(DWORD VA, int index, PIMAGE_SECTION_HEADER sectionHeaders) {
+
+    return (VA - sectionHeaders[index].VirtualAddress) + sectionHeaders[index].PointerToRawData;
+
+}
+
+
+DWORD rva_to_offset(DWORD rva, PIMAGE_SECTION_HEADER sectionHeaders, int numberOfSections) {
+    for (int i = 0; i < numberOfSections; i++) {
+        PIMAGE_SECTION_HEADER section = &sectionHeaders[i];
+        DWORD sectionStart = section->VirtualAddress;
+        DWORD sectionEnd = sectionStart + section->Misc.VirtualSize;
+        if (rva >= sectionStart && rva < sectionEnd) {
+            return (rva - sectionStart) + section->PointerToRawData;
+        }
+    }
+    return 0;
+}
+
 int locate_virtual_address(DWORD VA, DWORD no_of_sections, IMAGE_SECTION_HEADER *header) {
 
     int index = 0;
@@ -18,18 +51,6 @@ int locate_virtual_address(DWORD VA, DWORD no_of_sections, IMAGE_SECTION_HEADER 
         }
     }
     return index;
-}
-
-DWORD resolve_offset(DWORD VA, int index, IMAGE_SECTION_HEADER* header) {
-
-    return (VA - header[index].VirtualAddress) + header[index].PointerToRawData;
-
-}
-
-
-DWORD rva_to_offset(DWORD rva, DWORD virtual_o, DWORD raw_offset)
-{
-    return rva - virtual_o + raw_offset;
 }
 
 int main(int argc, char* argv[])
@@ -171,6 +192,51 @@ int main(int argc, char* argv[])
     std::printf("h0x%x\t\tADDITIONAL: Number of RVA and sizes\n", parsed_optional_header.NumberOfRvaAndSizes);
 
     /*
+     * sections:
+     * -> .text: contains executable code
+     * -> .data: contains initialized data
+     * -> .rdata: contains read-only data
+     * -> .bss: uninitialized data
+     * -> .idata: import tables
+     * -> .edata: export tables
+     * -> .reloc: contains relocation information
+     * -> .rsrc: contains resource information, like images or other embedded resources
+     * -> .tls: information about running threads of the program (thread local storage)
+     */
+
+    for (int i = 0; i < parsed_nt_header.FileHeader.NumberOfSections; i++)
+    {
+        IMAGE_SECTION_HEADER section_header = { 0, 0, 0 };
+        /*
+         * address calculation:
+         * buffer.data() -> the pointer to the start of the buffer
+         * parsed_dos_header->e_lfanew -> buffer offset where NT header starts
+         * sizeof(IMAGE_NT_HEADERS32) -> size of the NT header
+         * (i * sizeof(IMAGE_SECTION_HEADER)) -> offset for section header i
+         */
+        section_header = *reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (i * sizeof(IMAGE_SECTION_HEADER)));
+
+        std::printf("[SECTION %d]\n", i);
+        std::printf("%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0],
+            (char)section_header.Name[1],
+            (char)section_header.Name[2],
+            (char)section_header.Name[3],
+            (char)section_header.Name[4],
+            (char)section_header.Name[5],
+            (char)section_header.Name[6],
+            (char)section_header.Name[7]);
+        std::printf("h0x%x\t\tVirtual size\n", section_header.Misc.VirtualSize);
+        std::printf("h0x%x\t\tVirtual address\n", section_header.VirtualAddress);
+        std::printf("h0x%x\t\tSize of raw data\n", section_header.SizeOfRawData);
+        std::printf("h0x%x\t\tPointer to raw data\n", section_header.PointerToRawData);
+        std::printf("h0x%x\t\tPointer to relocations\n", section_header.PointerToRelocations);
+        std::printf("h0x%x\t\tPointer to line numbers\n", section_header.PointerToLinenumbers);
+        std::printf("h0x%x\t\tNumber of relocations\n", section_header.NumberOfRelocations);
+        std::printf("h0x%x\t\tNumber of line numbers\n", section_header.NumberOfLinenumbers);
+        std::printf("h0x%x\t\tCharacteristics\n", section_header.Characteristics);
+    }
+
+    /*
         data directories (following section is from winnt.h!) ->
 		// Directory Entries
 		#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
@@ -188,7 +254,7 @@ int main(int argc, char* argv[])
 		#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
 		#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
 		#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
-		#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor
+		#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptorIMAGE_DATA_DIRECTORY
 
 		Development notes:
         - data directories where *Address and *Size are zero, arent used!
@@ -196,61 +262,55 @@ int main(int argc, char* argv[])
 
     DWORD number_of_sections = parsed_nt_header.FileHeader.NumberOfSections;
     IMAGE_DATA_DIRECTORY import_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]; // <- import directory, like explained above
-    DWORD import_descriptor_address = resolve_offset(import_directory.VirtualAddress,  locate_virtual_address(number_of_sections, ));
 
-    std::printf("[IMPORT DIRECTORY]\n");
-    std::printf("Name: %s\n", *import_descriptor.Name);
+    PIMAGE_SECTION_HEADER section_headers = reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32));
 
-    /*
-     * sections:
-     * -> .text: contains executable code
-     * -> .data: contains initialized data
-     * -> .rdata: contains read-only data
-     * -> .bss: uninitialized data
-     * -> .idata: import tables
-     * -> .edata: export tables
-     * -> .reloc: contains relocation information
-     * -> .rsrc: contains resource information, like images or other embedded resources
-     * -> .tls: information about running threads of the program (thread local storage)
-     */
+    DWORD virtual_addr_import = import_directory.VirtualAddress;
+    DWORD size_import = import_directory.VirtualAddress;
 
-    for (int i = 0; i < parsed_nt_header.FileHeader.NumberOfSections; i++)
-    {
-    	IMAGE_SECTION_HEADER section_header = {0, 0, 0};
-        /*
-         * address calculation:
-         * buffer.data() -> the pointer to the start of the buffer
-         * parsed_dos_header->e_lfanew -> buffer offset where NT header starts
-         * sizeof(IMAGE_NT_HEADERS32) -> size of the NT header
-         * (i * sizeof(IMAGE_SECTION_HEADER)) -> offset for section header i
-         */
-		section_header = *reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (i * sizeof(IMAGE_SECTION_HEADER)));
+    DWORD fin_addr = rva_to_offset(virtual_addr_import, section_headers, number_of_sections);
 
-		std::printf("[SECTION %d]\n", i);
-		std::printf("%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0], 
-														(char)section_header.Name[1], 
-														(char)section_header.Name[2], 
-														(char)section_header.Name[3], 
-														(char)section_header.Name[4], 
-														(char)section_header.Name[5], 
-														(char)section_header.Name[6], 
-														(char)section_header.Name[7]);
-		std::printf("h0x%x\t\tVirtual size\n", section_header.Misc.VirtualSize);
-		std::printf("h0x%x\t\tVirtual address\n", section_header.VirtualAddress);
-		std::printf("h0x%x\t\tSize of raw data\n", section_header.SizeOfRawData);
-		std::printf("h0x%x\t\tPointer to raw data\n", section_header.PointerToRawData);
-		std::printf("h0x%x\t\tPointer to relocations\n", section_header.PointerToRelocations);
-		std::printf("h0x%x\t\tPointer to line numbers\n", section_header.PointerToLinenumbers);
-		std::printf("h0x%x\t\tNumber of relocations\n", section_header.NumberOfRelocations);
-		std::printf("h0x%x\t\tNumber of line numbers\n", section_header.NumberOfLinenumbers);
-		std::printf("h0x%x\t\tCharacteristics\n", section_header.Characteristics);  
+    DWORD addr2 = resolve(import_directory.VirtualAddress,locate(import_directory.VirtualAddress, section_headers, number_of_sections), section_headers);
+
+    int _import_directory_count = 0;
+    bool found = false;
+    while (!found) {
+        IMAGE_IMPORT_DESCRIPTOR tmp;
+        int offset = (_import_directory_count * sizeof(IMAGE_IMPORT_DESCRIPTOR)) + addr2;
+
+        file_stream.seekg(offset, std::ios_base::beg);
+        // fread(&tmp, sizeof(IMAGE_IMPORT_DESCRIPTOR), 1, file_stream);
+        file_stream.read(reinterpret_cast<char*>(&tmp), sizeof(IMAGE_IMPORT_DESCRIPTOR));
+
+        if(tmp.Name == 0)
+        {
+            break;
+        }
+
+    	DWORD name_addr = rva_to_offset(tmp.Name, section_headers, number_of_sections);
+
+        int name_size = 0;
+
+        while (true) {
+            char tmp_char;
+            file_stream.seekg((name_addr + name_size), std::ios_base::beg);
+            file_stream.read(&tmp_char, sizeof(char));
+            if (tmp_char == 0x00) {
+                break;
+            }
+            name_size++;
+        }
+
+        char* Name = new char[name_size + 2];
+
+        file_stream.seekg(name_addr, std::ios_base::beg);
+        file_stream.read(Name, (name_size * sizeof(char)) + 1);
+
+        printf("   * %s:\n", Name);
+        delete[] Name;
+
+        _import_directory_count++;
     }
-
-
-
-
-
-
 
 
     return 0;
