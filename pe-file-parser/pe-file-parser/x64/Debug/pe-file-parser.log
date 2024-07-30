@@ -7,6 +7,10 @@ C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-pars
   C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(32,17):
   consider using '%I64d' in the format string
   
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(197,42): warning C4474: 'printf' : too many arguments passed for format string
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(197,42):
+  placeholders and their parameters expect 7 variadic arguments, but 8 were provided
+  
   pe-file-parser.vcxproj -> C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\x64\Debug\pe-file-parser.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.

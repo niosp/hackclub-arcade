@@ -75,6 +75,11 @@ int main(int argc, char* argv[])
     IMAGE_NT_HEADERS32 parsed_nt_header = {0, 0, 0};
     parsed_nt_header = *reinterpret_cast<PIMAGE_NT_HEADERS32>(buffer.data() + parsed_dos_header->e_lfanew);
 
+    if (parsed_nt_header.Signature != IMAGE_NT_SIGNATURE) {
+        std::cerr << "Not a valid PE file\n";
+        return -1;
+    }
+
     std::printf("[NT HEADER]\n");
     std::printf("h0x%x\t\tSignature\n", parsed_nt_header.Signature);
     std::printf("[NT HEADER - IMAGE_NT_HEADERS32\n");
@@ -118,26 +123,88 @@ int main(int argc, char* argv[])
     std::printf("h0x%x\tDEFAULT: Base of data\n", parsed_optional_header.BaseOfData);
 
     /* optional values needed by the windows pe loader */
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.ImageBase);
+    std::printf("h0x%x\tADDITIONAL: Image base\n", parsed_optional_header.ImageBase);
     std::printf("h0x%x\t\tADDITIONAL: Section alignment\n", parsed_optional_header.SectionAlignment);
     std::printf("h0x%x\t\tADDITIONAL: Major os version\n", parsed_optional_header.MajorOperatingSystemVersion);
     std::printf("h0x%x\t\tADDITIONAL: Minor os version\n", parsed_optional_header.MinorOperatingSystemVersion);
     std::printf("h0x%x\t\tADDITIONAL: Major image version\n", parsed_optional_header.MajorImageVersion);
     std::printf("h0x%x\t\tADDITIONAL: Minor image version\n", parsed_optional_header.MinorImageVersion);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.MajorSubsystemVersion);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.MinorSubsystemVersion);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.Win32VersionValue);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.SizeOfImage);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.SizeOfHeaders);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.CheckSum);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.Subsystem);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.DllCharacteristics);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.SizeOfStackReserve);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.SizeOfStackCommit);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.SizeOfHeapReserve);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.SizeOfHeapCommit);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.LoaderFlags);
-    std::printf("h0x%x\t\tADDITIONAL: Image base\n", parsed_optional_header.NumberOfRvaAndSizes);
+    std::printf("h0x%x\t\tADDITIONAL: Major subsystem version\n", parsed_optional_header.MajorSubsystemVersion);
+    std::printf("h0x%x\t\tADDITIONAL: Minor subsystem version\n", parsed_optional_header.MinorSubsystemVersion);
+    std::printf("h0x%x\t\tADDITIONAL: Win32 version value\n", parsed_optional_header.Win32VersionValue);
+    std::printf("h0x%x\tADDITIONAL: Size of image\n", parsed_optional_header.SizeOfImage);
+    std::printf("h0x%x\t\tADDITIONAL: Size of headers\n", parsed_optional_header.SizeOfHeaders);
+    std::printf("h0x%x\tADDITIONAL: Checksum\n", parsed_optional_header.CheckSum);
+    std::printf("h0x%x\t\tADDITIONAL: Subsystem\n", parsed_optional_header.Subsystem);
+    std::printf("h0x%x\t\tADDITIONAL: DLL characteristics\n", parsed_optional_header.DllCharacteristics);
+    std::printf("h0x%x\tADDITIONAL: Size of stack reserve\n", parsed_optional_header.SizeOfStackReserve);
+    std::printf("h0x%x\t\tADDITIONAL: Size of stack commit\n", parsed_optional_header.SizeOfStackCommit);
+    std::printf("h0x%x\tADDITIONAL: Size of heap reserve\n", parsed_optional_header.SizeOfHeapReserve);
+    std::printf("h0x%x\t\tADDITIONAL: Size of heap commit\n", parsed_optional_header.SizeOfHeapCommit);
+    std::printf("h0x%x\t\tADDITIONAL: Loader flags\n", parsed_optional_header.LoaderFlags);
+    std::printf("h0x%x\t\tADDITIONAL: Number of RVA and sizes\n", parsed_optional_header.NumberOfRvaAndSizes);
+
+    /*
+        data directories (following section is from winnt.h!) ->
+		// Directory Entries
+		#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
+		#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory
+		#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory
+		#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory
+		#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory
+		#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table
+		#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory
+		//      IMAGE_DIRECTORY_ENTRY_COPYRIGHT       7   // (X86 usage)
+		#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data
+		#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP
+		#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory
+		#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory
+		#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
+		#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
+		#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
+		#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor
+
+		Development notes:
+        - data directories where *Address and *Size are zero, arent used!
+    */
+
+    /*
+     * sections:
+     * -> .text: contains executable code
+     * -> .data: contains initialized data
+     * -> .rdata: contains read-only data
+     * -> .bss: uninitialized data
+     * -> .idata: import tables
+     * -> .edata: export tables
+     * -> .reloc: contains relocation information
+     * -> .rsrc: contains resource information, like images or other embedded resources
+     * -> .tls: information about running threads of the program (thread local storage)
+     */
+
+    for (int i = 0; i < parsed_nt_header.FileHeader.NumberOfSections; i++)
+    {
+    	IMAGE_SECTION_HEADER section_header = {0, 0, 0};
+		section_header = *reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (i * sizeof(IMAGE_SECTION_HEADER)));
+
+		std::printf("[SECTION %d]\n", i);
+		std::printf("%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0], 
+														(char)section_header.Name[1], 
+														(char)section_header.Name[2], 
+														(char)section_header.Name[3], 
+														(char)section_header.Name[4], 
+														(char)section_header.Name[5], 
+														(char)section_header.Name[6], 
+														(char)section_header.Name[7]);
+		std::printf("h0x%x\t\tVirtual size\n", section_header.Misc.VirtualSize);
+		std::printf("h0x%x\t\tVirtual address\n", section_header.VirtualAddress);
+		std::printf("h0x%x\t\tSize of raw data\n", section_header.SizeOfRawData);
+		std::printf("h0x%x\t\tPointer to raw data\n", section_header.PointerToRawData);
+		std::printf("h0x%x\t\tPointer to relocations\n", section_header.PointerToRelocations);
+		std::printf("h0x%x\t\tPointer to line numbers\n", section_header.PointerToLinenumbers);
+		std::printf("h0x%x\t\tNumber of relocations\n", section_header.NumberOfRelocations);
+		std::printf("h0x%x\t\tNumber of line numbers\n", section_header.NumberOfLinenumbers);
+		std::printf("h0x%x\t\tCharacteristics\n", section_header.Characteristics);  
+    }
 
 
 
