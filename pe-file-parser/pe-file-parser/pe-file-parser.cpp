@@ -6,19 +6,6 @@
 #include <cstdint>
 #include <vector>
 
-typedef struct _IMAGE_IMPORT_DESCRIPTOR {
-    union {
-        DWORD   Characteristics;
-        DWORD   OriginalFirstThunk;
-    } DUMMYUNIONNAME;
-    DWORD   TimeDateStamp;
-    DWORD   ForwarderChain;
-    DWORD   Name;
-    DWORD   FirstThunk;
-} IMAGE_IMPORT_DESCRIPTOR;
-typedef IMAGE_IMPORT_DESCRIPTOR UNALIGNED* PIMAGE_IMPORT_DESCRIPTOR;
-
-
 int main(int argc, char* argv[])
 {
     if(argc <= 1) {
@@ -180,6 +167,12 @@ int main(int argc, char* argv[])
 		Development notes:
         - data directories where *Address and *Size are zero, arent used!
     */
+
+    IMAGE_DATA_DIRECTORY import_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]; // <- import directory, like explained above
+    IMAGE_IMPORT_DESCRIPTOR import_descriptor = *reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(buffer.data() + import_directory.VirtualAddress);
+
+    std::printf("[IMPORT DIRECTORY]\n");
+    std::printf("Name: %s\n", import_descriptor.Name);
 
     /*
      * sections:
