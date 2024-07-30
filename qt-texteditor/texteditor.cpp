@@ -54,6 +54,7 @@ void TextEditor::on_actionOpen_File_triggered()
             QString str = QString::fromStdString(contents);
             ui->plainTextEdit->setPlainText(str);
             this->currentFile = fileName;
+            this->m_statusLeft->setText("Editing " + fileName);
         }
     }
 }
@@ -158,7 +159,7 @@ void TextEditor::find_string(QString s, bool reverse, bool casesens, bool words)
         ui->plainTextEdit->setTextCursor(cursor);
         if (!ui->plainTextEdit->find(s, flag))
         {
-            //no match in whole document, use the old cursor!
+            //no match in whole document? use the old cursor!
             QMessageBox msgBox;
             msgBox.setText(tr("String not found."));
             msgBox.setStandardButtons(QMessageBox::Ok);

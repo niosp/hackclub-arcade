@@ -24,7 +24,21 @@
     <item>
      <widget class="QPlainTextEdit" name="plainTextEdit">
       <property name="styleSheet">
-       <string notr="true">selection-background-color: rgb(110,73,255);</string>
+       <string notr="true">QPlainTextEdit {
+    border-radius: 5px; /* Rounds the corners */
+    border: 1px solid rgb(110,73,255); /* Border color and thickness */
+    padding: 1px; /* Padding inside the text area */
+	selection-background-color: rgb(110,73,255);
+}
+
+QPlainTextEdit:focus {
+    border-color: rgb(110,73,255); /* Border color when focused */
+}
+
+QPlainTextEdit::hover {
+    border-color: rgb(110,73,255); /* Border color when hovered */
+}
+</string>
       </property>
       <property name="plainText">
        <string/>

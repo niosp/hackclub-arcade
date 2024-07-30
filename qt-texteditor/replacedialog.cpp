@@ -30,9 +30,6 @@ void ReplaceDialog::on_cancelButton_clicked()
 
 void ReplaceDialog::on_replaceButton_clicked()
 {
-    qDebug() << this->ui->originalString->text();
-    qDebug() << this->edit->toPlainText();
-
     QTextDocument::FindFlags flag;
     if (this->ui->backward_chk->isChecked()) flag |= QTextDocument::FindBackward;
     if (this->ui->case_sen_chk->isChecked()) flag |= QTextDocument::FindCaseSensitively;
