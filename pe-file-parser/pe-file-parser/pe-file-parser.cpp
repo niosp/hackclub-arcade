@@ -6,6 +6,32 @@
 #include <cstdint>
 #include <vector>
 
+int locate_virtual_address(DWORD VA, DWORD no_of_sections, IMAGE_SECTION_HEADER *header) {
+
+    int index = 0;
+
+    for (int i = 0; i < no_of_sections; i++) {
+        if (VA >= header[i].VirtualAddress
+            && VA < (header[i].VirtualAddress + header[i].Misc.VirtualSize)) {
+            index = i;
+            break;
+        }
+    }
+    return index;
+}
+
+DWORD resolve_offset(DWORD VA, int index, IMAGE_SECTION_HEADER* header) {
+
+    return (VA - header[index].VirtualAddress) + header[index].PointerToRawData;
+
+}
+
+
+DWORD rva_to_offset(DWORD rva, DWORD virtual_o, DWORD raw_offset)
+{
+    return rva - virtual_o + raw_offset;
+}
+
 int main(int argc, char* argv[])
 {
     if(argc <= 1) {
@@ -168,11 +194,12 @@ int main(int argc, char* argv[])
         - data directories where *Address and *Size are zero, arent used!
     */
 
+    DWORD number_of_sections = parsed_nt_header.FileHeader.NumberOfSections;
     IMAGE_DATA_DIRECTORY import_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT]; // <- import directory, like explained above
-    IMAGE_IMPORT_DESCRIPTOR import_descriptor = *reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(buffer.data() + import_directory.VirtualAddress);
+    DWORD import_descriptor_address = resolve_offset(import_directory.VirtualAddress,  locate_virtual_address(number_of_sections, ));
 
     std::printf("[IMPORT DIRECTORY]\n");
-    std::printf("Name: %s\n", import_descriptor.Name);
+    std::printf("Name: %s\n", *import_descriptor.Name);
 
     /*
      * sections:
