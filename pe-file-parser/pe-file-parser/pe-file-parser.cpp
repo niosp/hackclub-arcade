@@ -6,6 +6,19 @@
 #include <cstdint>
 #include <vector>
 
+typedef struct _IMAGE_IMPORT_DESCRIPTOR {
+    union {
+        DWORD   Characteristics;
+        DWORD   OriginalFirstThunk;
+    } DUMMYUNIONNAME;
+    DWORD   TimeDateStamp;
+    DWORD   ForwarderChain;
+    DWORD   Name;
+    DWORD   FirstThunk;
+} IMAGE_IMPORT_DESCRIPTOR;
+typedef IMAGE_IMPORT_DESCRIPTOR UNALIGNED* PIMAGE_IMPORT_DESCRIPTOR;
+
+
 int main(int argc, char* argv[])
 {
     if(argc <= 1) {
@@ -50,7 +63,7 @@ int main(int argc, char* argv[])
     std::printf("h0x%x\t\tInitial IP value\n", parsed_dos_header->e_ip);
     std::printf("h0x%x\t\tInitial CS value\n", parsed_dos_header->e_cs);
     std::printf("h0x%x\t\tOverlay number\n", parsed_dos_header->e_ovno);
-    std::printf("h0x%x\t\tAddress of new exe header\n", parsed_dos_header->e_lfanew);
+    std::printf("h0x%x\t\tAddress of NT header\n", parsed_dos_header->e_lfanew);
     std::printf("h0x%x\t\tOEM information\n", parsed_dos_header->e_oeminfo);
     std::printf("h0x%x\t\tOEM id\n", parsed_dos_header->e_oemid);
     std::printf("h0x%x\t\tAddress of the relocation table\n", parsed_dos_header->e_lfarlc);
@@ -184,6 +197,13 @@ int main(int argc, char* argv[])
     for (int i = 0; i < parsed_nt_header.FileHeader.NumberOfSections; i++)
     {
     	IMAGE_SECTION_HEADER section_header = {0, 0, 0};
+        /*
+         * address calculation:
+         * buffer.data() -> the pointer to the start of the buffer
+         * parsed_dos_header->e_lfanew -> buffer offset where NT header starts
+         * sizeof(IMAGE_NT_HEADERS32) -> size of the NT header
+         * (i * sizeof(IMAGE_SECTION_HEADER)) -> offset for section header i
+         */
 		section_header = *reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (i * sizeof(IMAGE_SECTION_HEADER)));
 
 		std::printf("[SECTION %d]\n", i);
@@ -205,6 +225,8 @@ int main(int argc, char* argv[])
 		std::printf("h0x%x\t\tNumber of line numbers\n", section_header.NumberOfLinenumbers);
 		std::printf("h0x%x\t\tCharacteristics\n", section_header.Characteristics);  
     }
+
+
 
 
 
