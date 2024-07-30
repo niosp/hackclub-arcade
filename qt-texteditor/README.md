@@ -20,3 +20,8 @@ A simple and lightweight texteditor written in C++ using Qt 6.7.2
 - Run Qt Creator, import the project
 - Configure targets and installed kits
 - Build the solution, run the editor
+
+### Impressions
+![Find and replace](screenshot-1.png)
+
+![Titlebar menu](screenshot-2.png)
