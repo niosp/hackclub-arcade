@@ -128,6 +128,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="pe-file-parser.cpp" />
+    <ClCompile Include="pe_parser.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pe_parser.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

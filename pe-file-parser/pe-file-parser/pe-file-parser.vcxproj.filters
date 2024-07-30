@@ -18,5 +18,13 @@
     <ClCompile Include="pe-file-parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="pe_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pe_parser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
