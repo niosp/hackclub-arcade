@@ -6,38 +6,11 @@
 #include <cstdint>
 #include <vector>
 
-struct image_import_descriptor {
-    DWORD original_first_thunk; /* RVA of the import name table */
-    DWORD time_date_stamp;      /* Not used! */
-    DWORD forwarder_chain;      /* Also not used! */
-    DWORD name;                 /* RVA of the DLL name */
-    DWORD first_thunk;          /* RVA of the IAT */
-};
 
-std::vector<std::string> parse_imported_functions(const BYTE* memory, DWORD import_name_table_rva)
-{
-    std::vector<std::string> function_names;
-    image_import_descriptor* thunk_data = (image_import_descriptor*)(memory + import_name_table_rva);
-
-    while (thunk_data->u1.address_of_data) {
-        if (thunk_data->u1.address_of_data & IMAGE_ORDINAL_FLAG32) {
-            DWORD ordinal = thunk_data->u1.ordinal & 0xFFFF;
-            function_names.push_back("Ordinal_" + std::to_string(ordinal));
-        }
-        else {
-            void* import_by_name = reinterpret_cast<void>(memory + thunk_data->u1.address_of_data);
-            std::string function_name(import_by_name->name);
-            function_names.push_back(function_name);
-        }
-        thunk_data++;
-    }
-
-    return function_names;
-}
 
 int locate(DWORD VA, PIMAGE_SECTION_HEADER section_headers, DWORD number_of_sections) {
 
-    int index;
+    int index = 0;
 
     for (int i = 0; i < number_of_sections; i++) {
         if (VA >= section_headers[i].VirtualAddress
@@ -80,6 +53,29 @@ int locate_virtual_address(DWORD VA, DWORD no_of_sections, IMAGE_SECTION_HEADER 
         }
     }
     return index;
+}
+
+void parse_exports(IMAGE_NT_HEADERS32 parsed_nt_headers) {
+    IMAGE_DATA_DIRECTORY export_data_dir = parsed_nt_headers.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    if (export_data_dir.Size == 0) {
+        std::cout << "No export table found." << "\n";
+        return;
+    }
+
+    PIMAGE_EXPORT_DIRECTORY export_directory = (PIMAGE_EXPORT_DIRECTORY)((BYTE*)+ export_data_dir.VirtualAddress);
+
+    DWORD* function_addresses = (DWORD*)((BYTE*)export_data_dir->AddressOfFunctions);
+    DWORD* name_addr = (DWORD*)((BYTE*)export_data_dir->AddressOfNames);
+    WORD* ordinals = (WORD*)((BYTE*)export_data_dir->AddressOfNameOrdinals);
+
+    std::cout << "Exported functions:" << "\n";
+
+    for (DWORD i = 0; i < export_data_dir.NumberOfNames; i++) {
+        char* func_name = (char*)((BYTE*)name_addr[i]);
+        DWORD func_rva = func_addr[ordinals[i]];
+        FARPROC func_adr = (FARPROC)((BYTE*)func_rva);
+        std::cout << "  Function name: " << func_name << ", Address: " << func_rva << "\n";
+    }
 }
 
 int main(int argc, char* argv[])
@@ -246,7 +242,7 @@ int main(int argc, char* argv[])
         section_header = *reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (i * sizeof(IMAGE_SECTION_HEADER)));
 
         std::printf("[SECTION %d]\n", i);
-        std::printf("%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0],
+        std::printf("%c%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0],
             (char)section_header.Name[1],
             (char)section_header.Name[2],
             (char)section_header.Name[3],
@@ -301,12 +297,12 @@ int main(int argc, char* argv[])
 
     DWORD addr2 = resolve(import_directory.VirtualAddress,locate(import_directory.VirtualAddress, section_headers, number_of_sections), section_headers);
 
-    int _import_directory_count = 0;
+    int import_directory_count = 0;
     bool found = false;
     /* loop through each DLL */
     while (!found) {
         IMAGE_IMPORT_DESCRIPTOR tmp;
-        int offset = (_import_directory_count * sizeof(IMAGE_IMPORT_DESCRIPTOR)) + addr2;
+        int offset = (import_directory_count * sizeof(IMAGE_IMPORT_DESCRIPTOR)) + addr2;
 
         file_stream.seekg(offset, std::ios_base::beg);
         // fread(&tmp, sizeof(IMAGE_IMPORT_DESCRIPTOR), 1, file_stream);
@@ -354,26 +350,56 @@ int main(int argc, char* argv[])
             std::cout << "BOUND: TRUE\n";
         }
 
+        /*
+         * some small explanations:
+         * - OriginalFirstThunk is an RVA to an array of objects from type IMAGE_THUNK_DATA
+         * - afaik, the objects inside the array have a fixed-size
+         * - struct IMAGE_THUNK_DATA contains the following information:
+         *      - AddressOfData: RVA to IMAGE_IMPORT_BY_NAME which contains an RVA to function name string (terminated by \0)
+         *      - Ordinal: ID of the ordinal
+         *      - Function: will be used after function got resolved, contains RVA of th imported function
+         *  -> u1 as a member of IMAGE_THUNK_DATA32 is declared as union, so details of vars aren't fixed!
+         *  -> imported by ordinal or by name depends on the high bit value (IMAGE_ORDINAL_FLAG32) present in u1->AddressOfData
+         *
+         *  definition of IMAGE_THUNK_DATA32 from file "winnt.h"
+         *
+         *  typedef struct _IMAGE_THUNK_DATA32 {
+		 *   union { <- union
+		 *       DWORD ForwarderString;  // Not used in standard imports
+		 *       DWORD Function;         // Address of the function once resolved
+		 *       DWORD Ordinal;          // Ordinal value if imported by ordinal
+		 *       DWORD AddressOfData;    // RVA to the IMAGE_IMPORT_BY_NAME structure
+		 *   } u1; -> accessible by u1
+	 	 *  } IMAGE_THUNK_DATA32;
+         */
         DWORD arr_thunk_data = rva_to_offset(tmp.OriginalFirstThunk, section_headers, number_of_sections);
 
-        DWORD counter_entries = 0;
+        std::vector<std::string> function_names;
+        IMAGE_THUNK_DATA32* thunk_data = (IMAGE_THUNK_DATA32*)(buffer.data() + arr_thunk_data);
 
+        while (thunk_data->u1.AddressOfData) {
+            if (thunk_data->u1.AddressOfData & IMAGE_ORDINAL_FLAG32) {
+                /* import by ordinal (without function name) */
+                DWORD ordinal = thunk_data->u1.Ordinal & 0xFFFF;
+                function_names.push_back("Ordinal_" + std::to_string(ordinal));
+            }
+            else {
+                /* normal import by name */
+                IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(buffer.data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, number_of_sections));
+                function_names.push_back(import_by_name->Name);
 
-        while(true)
-        {
-            IMAGE_THUNK_DATA32 thunk_data;
-            DWORD thunk_data_addr = arr_thunk_data + (counter_entries * sizeof(IMAGE_THUNK_DATA32));
-            file_stream.seekg(thunk_data_addr, std::ios_base::beg);
-            file_stream.read(reinterpret_cast<char*>(&thunk_data), sizeof(IMAGE_THUNK_DATA32));
-
-            IMAGE_IMPORT_BY_NAME import_entry;
-            DWORD import_entry_addr = rva_to_offset(thunk_data.u1.AddressOfData, section_headers, number_of_sections);
-            file_stream.seekg(import_entry_addr, std::ios_base::beg);
-            file_stream.read(reinterpret_cast<char*>(&import_entry), sizeof(IMAGE_IMPORT_BY_NAME));
-            counter_entries++;
+                thunk_data->u1->
+            }
+            thunk_data++;
         }
 
-        _import_directory_count++;
+
+        for (size_t i = 0; i < function_names.size(); ++i) {
+            std::cout << function_names[i] << " ";
+        }
+        std::cout << std::endl;
+
+    	import_directory_count++;
     }
 
 

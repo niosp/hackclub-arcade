@@ -6,9 +6,17 @@
 #include <cstdint>
 #include <vector>
 
+struct image_import_descriptor {
+    DWORD original_first_thunk; /* RVA of the import name table */
+    DWORD time_date_stamp;      /* Not used! */
+    DWORD forwarder_chain;      /* Also not used! */
+    DWORD name;                 /* RVA of the DLL name */
+    DWORD first_thunk;          /* RVA of the IAT */
+};
+
 int locate(DWORD VA, PIMAGE_SECTION_HEADER section_headers, DWORD number_of_sections) {
 
-    int index;
+    int index = 0;
 
     for (int i = 0; i < number_of_sections; i++) {
         if (VA >= section_headers[i].VirtualAddress
@@ -217,7 +225,7 @@ int main(int argc, char* argv[])
         section_header = *reinterpret_cast<PIMAGE_SECTION_HEADER>(buffer.data() + parsed_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (i * sizeof(IMAGE_SECTION_HEADER)));
 
         std::printf("[SECTION %d]\n", i);
-        std::printf("%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0],
+        std::printf("%c%c%c%c%c%c%c%c\t\tName\n", (char)section_header.Name[0],
             (char)section_header.Name[1],
             (char)section_header.Name[2],
             (char)section_header.Name[3],
@@ -330,25 +338,33 @@ int main(int argc, char* argv[])
         DWORD counter_entries = 0;
 
 
-        while(true)
-        {
-            IMAGE_THUNK_DATA32 thunk_data;
-            DWORD thunk_data_addr = arr_thunk_data + (counter_entries * sizeof(IMAGE_THUNK_DATA32));
-            file_stream.seekg(thunk_data_addr, std::ios_base::beg);
-            file_stream.read(reinterpret_cast<char*>(&thunk_data), sizeof(IMAGE_THUNK_DATA32));
 
-            IMAGE_IMPORT_BY_NAME import_entry;
-            DWORD import_entry_addr = rva_to_offset(thunk_data.u1.AddressOfData, section_headers, number_of_sections);
-            file_stream.seekg(import_entry_addr, std::ios_base::beg);
-            file_stream.read(reinterpret_cast<char*>(&import_entry), sizeof(IMAGE_IMPORT_BY_NAME));
+		//std::vector<std::string> asd = parse_imported_functions(buffer, arr_thunk_data);
 
+        std::vector<std::string> function_names;
+        IMAGE_THUNK_DATA32* thunk_data = (IMAGE_THUNK_DATA32*)(buffer.data() + arr_thunk_data);
 
-
-            counter_entries++;
-
+        while (thunk_data->u1.AddressOfData) {
+            if (thunk_data->u1.AddressOfData & IMAGE_ORDINAL_FLAG32) {
+                /* Import by ordinal (not used in this example) */
+                DWORD ordinal = thunk_data->u1.Ordinal & 0xFFFF;
+                function_names.push_back("Ordinal_" + std::to_string(ordinal));
+            }
+            else {
+                /* Import by name */
+                IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(buffer.data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, number_of_sections));
+                function_names.push_back(import_by_name->Name);
+            }
+            thunk_data++;
         }
 
-        _import_directory_count++;
+
+        for (size_t i = 0; i < function_names.size(); ++i) {
+            std::cout << function_names[i] << " ";
+        }
+        std::cout << std::endl;
+
+    	_import_directory_count++;
     }
 
 
