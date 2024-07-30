@@ -6,6 +6,35 @@
 #include <cstdint>
 #include <vector>
 
+struct image_import_descriptor {
+    DWORD original_first_thunk; /* RVA of the import name table */
+    DWORD time_date_stamp;      /* Not used! */
+    DWORD forwarder_chain;      /* Also not used! */
+    DWORD name;                 /* RVA of the DLL name */
+    DWORD first_thunk;          /* RVA of the IAT */
+};
+
+std::vector<std::string> parse_imported_functions(const BYTE* memory, DWORD import_name_table_rva)
+{
+    std::vector<std::string> function_names;
+    image_import_descriptor* thunk_data = (image_import_descriptor*)(memory + import_name_table_rva);
+
+    while (thunk_data->u1.address_of_data) {
+        if (thunk_data->u1.address_of_data & IMAGE_ORDINAL_FLAG32) {
+            DWORD ordinal = thunk_data->u1.ordinal & 0xFFFF;
+            function_names.push_back("Ordinal_" + std::to_string(ordinal));
+        }
+        else {
+            void* import_by_name = reinterpret_cast<void>(memory + thunk_data->u1.address_of_data);
+            std::string function_name(import_by_name->name);
+            function_names.push_back(function_name);
+        }
+        thunk_data++;
+    }
+
+    return function_names;
+}
+
 int locate(DWORD VA, PIMAGE_SECTION_HEADER section_headers, DWORD number_of_sections) {
 
     int index;
@@ -341,11 +370,7 @@ int main(int argc, char* argv[])
             DWORD import_entry_addr = rva_to_offset(thunk_data.u1.AddressOfData, section_headers, number_of_sections);
             file_stream.seekg(import_entry_addr, std::ios_base::beg);
             file_stream.read(reinterpret_cast<char*>(&import_entry), sizeof(IMAGE_IMPORT_BY_NAME));
-
-
-
             counter_entries++;
-
         }
 
         _import_directory_count++;
