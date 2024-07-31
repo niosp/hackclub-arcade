@@ -6,21 +6,30 @@
 #include <cstdint>
 #include <vector>
 
+const std::string RESET_COLOR = "\033[0m";
+const std::string RED_COLOR = "\033[31m";
+const std::string GREEN_COLOR = "\033[32m";
+const std::string YELLOW_COLOR = "\033[33m";
+const std::string BLUE_COLOR = "\033[34m";
+const std::string MAGENTA_COLOR = "\033[35m";
+const std::string CYAN_COLOR = "\033[36m";
+
+void print_staircase(const std::vector<std::string>& items, int indentation) {
+    const std::vector<std::string> colors = { RED_COLOR, GREEN_COLOR, YELLOW_COLOR,BLUE_COLOR, MAGENTA_COLOR, CYAN_COLOR };
+	for (size_t i = 0; i < items.size(); ++i) {
+        for (int j = 0; j < static_cast<int>(i) * indentation; ++j) {
+            std::cout << ' ';
+        }
+        std::cout << colors[i % colors.size()] << items[i] << RESET_COLOR << "\n";
+    }
+}
+
 template<typename T>
 T readData(std::ifstream& file) {
     T data;
     file.read(reinterpret_cast<char*>(&data), sizeof(T));
     return data;
 }
-
-struct ResourceDirectory {
-    DWORD Characteristics;
-    DWORD TimeDateStamp;
-    WORD MajorVersion;
-    WORD MinorVersion;
-    WORD NumberOfNamedEntries;
-    WORD NumberOfIdEntries;
-};
 
 void read_resource_directory_entry(std::ifstream& file, IMAGE_RESOURCE_DIRECTORY_ENTRY& entry) {
     file.read(reinterpret_cast<char*>(&entry), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
@@ -396,7 +405,6 @@ int main(int argc, char* argv[])
     }
 
     /* parse basereloc */
-
     IMAGE_DATA_DIRECTORY directory_entry_basereloc_rva = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
     DWORD base_relocation_directory_addr = rva_to_offset(directory_entry_basereloc_rva.VirtualAddress, section_headers, number_of_sections);
 
@@ -446,6 +454,8 @@ int main(int argc, char* argv[])
     bool end_in_dir_reached = false;
 
     DWORD ctr = 0;
+
+
 
     if (resource_directory.Size != 0)
     {

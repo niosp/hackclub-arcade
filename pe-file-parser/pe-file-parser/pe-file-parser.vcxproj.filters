@@ -18,12 +18,18 @@
     <ClCompile Include="pe-file-parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pe_parser.cpp">
+    <ClCompile Include="ResourceDirectory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceDirectoryEntry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pe_parser.hpp">
+    <ClInclude Include="ResourceDirectory.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceDirectoryEntry.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
