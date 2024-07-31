@@ -419,6 +419,8 @@ int main(int argc, char* argv[])
             break;
         }
 
+        /* todo: calculate amount of entries  */
+
         base_relocations_vec.emplace_back(temp_base_relo);
 
         basereloc_directory_counter++;
@@ -427,6 +429,20 @@ int main(int argc, char* argv[])
 
     /* .rsrc */
     /* https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#the-rsrc-section */
+
+    IMAGE_DATA_DIRECTORY resource_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE];
+   
+    DWORD resource_size = resource_directory.Size;
+    DWORD resource_rva = resource_directory.VirtualAddress;
+
+    DWORD resource_offset = rva_to_offset(resource_rva, section_headers, number_of_sections);
+
+    IMAGE_RESOURCE_DIRECTORY dir;
+    file_stream.seekg(resource_offset, std::ios_base::beg);
+    file_stream.read(reinterpret_cast<char*>(&dir), sizeof(IMAGE_RESOURCE_DIRECTORY));
+
+
+
 
     struct ResourceDirectory {
         DWORD Characteristics;
@@ -438,12 +454,6 @@ int main(int argc, char* argv[])
     };
 
     IMAGE_SECTION_HEADER resourceSection;
-    for (const auto& section : section_headers) {
-        if (std::string(reinterpret_cast<const char*>(section.Name), 8) == ".rsrc") {
-            resourceSection = section;
-            break;
-        }
-    }
 
     /* todo: parse resource directory + base relocations */
 
