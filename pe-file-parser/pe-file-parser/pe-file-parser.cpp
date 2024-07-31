@@ -445,24 +445,57 @@ int main(int argc, char* argv[])
 
     bool end_in_dir_reached = false;
 
+    DWORD ctr = 0;
+
     if (resource_directory.Size != 0)
     {
         for (int i=0; i < dir.NumberOfIdEntries + dir.NumberOfNamedEntries; i++)
         {
-            IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry;
+            std::cout << "\n" << ctr++ << "\n";
+
+
+            std::cout << "\n\nFOR1: " << dir.NumberOfIdEntries + dir.NumberOfNamedEntries << std::endl;
+
+            IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1;
             file_stream.seekg(resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
-            file_stream.read(reinterpret_cast<char*>(&dir_entry), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+            file_stream.read(reinterpret_cast<char*>(&dir_entry_1), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
+            IMAGE_RESOURCE_DIRECTORY dir_1;
+            DWORD dir_1_offset = dir_entry_1.OffsetToDirectory + resource_offset;
+            file_stream.seekg(dir_1_offset, std::ios_base::beg);
+            file_stream.read(reinterpret_cast<char*>(&dir_1), sizeof(IMAGE_RESOURCE_DIRECTORY));
 
+            for(int j=0; j < dir_1.NumberOfNamedEntries + dir_1.NumberOfIdEntries; j++)
+            {
+                std::cout << "FOR2: " << dir_1.NumberOfNamedEntries + dir_1.NumberOfIdEntries << std::endl;
 
-            DWORD nested_dir_offset = dir_entry.OffsetToDirectory + resource_offset;
-            IMAGE_RESOURCE_DIRECTORY nested_dir;
-            file_stream.seekg(nested_dir_offset, std::ios_base::beg);
-            file_stream.read(reinterpret_cast<char*>(&nested_dir), sizeof(IMAGE_RESOURCE_DIRECTORY));
+                IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_2;
+                file_stream.seekg(dir_1_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + j * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
+                file_stream.read(reinterpret_cast<char*>(&dir_entry_2), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
+                IMAGE_RESOURCE_DIRECTORY dir_2;
+                DWORD dir_2_offset = dir_entry_2.OffsetToDirectory + resource_offset;
+                file_stream.seekg(dir_2_offset, std::ios_base::beg);
+                file_stream.read(reinterpret_cast<char*>(&dir_2), sizeof(IMAGE_RESOURCE_DIRECTORY));
 
+                for(int k=0; k < dir_2.NumberOfNamedEntries + dir_2.NumberOfIdEntries; k++)
+                {
+                    if (dir_2.NumberOfNamedEntries + dir_2.NumberOfIdEntries > 1)
+                    {
+                        std::cout << "I: " << i << " J: " << j << " K:" << j << std::endl;
+                        return -2;
+                    }
+                    std::cout << "FOR3: " << dir_2.NumberOfNamedEntries + dir_2.NumberOfIdEntries << std::endl;
 
-            std::cout << "asd";
+                    IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_3;
+                    file_stream.seekg(dir_2_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + k * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
+                    file_stream.read(reinterpret_cast<char*>(&dir_entry_3), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                }
+
+            }
+
+            Sleep(500);
         }
     }
 
