@@ -1,6 +1,10 @@
 #pragma once
 
+#include <memory>
+#include <vector>
 #include <windows.h>
+
+class ResourceDirectoryEntry;
 
 class ResourceDirectory
 {
@@ -12,6 +16,8 @@ public:
 	WORD get_minor_version() const;
 	WORD get_number_of_named_entries() const;
 	WORD get_number_of_id_entries() const;
+	void insert_directory_entry(std::shared_ptr<ResourceDirectoryEntry> p_entry) const;
+	std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> get_directory_entries();
 private:
 	DWORD characteristics;
 	DWORD time_date_stamp;
@@ -19,4 +25,5 @@ private:
 	WORD minor_version;
 	WORD number_of_named_entries;
 	WORD number_of_id_entries;
+	std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> resource_entries;
 };

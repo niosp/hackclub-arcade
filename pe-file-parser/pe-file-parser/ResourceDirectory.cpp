@@ -1,4 +1,5 @@
 #include "ResourceDirectory.hpp"
+#include "ResourceDirectoryEntry.hpp"
 
 #include <windows.h>
 
@@ -10,6 +11,7 @@ ResourceDirectory::ResourceDirectory(DWORD p_characteristics, DWORD p_time_date_
 	this->minor_version = p_minor_version;
 	this->number_of_named_entries = p_number_of_named_entries;
 	this->number_of_id_entries = p_number_of_id_entries;
+	this->resource_entries = std::make_shared<std::vector<std::shared_ptr<ResourceDirectoryEntry>>>();
 }
 
 DWORD ResourceDirectory::get_characteristics() const
@@ -40,4 +42,14 @@ WORD ResourceDirectory::get_number_of_named_entries() const
 WORD ResourceDirectory::get_number_of_id_entries() const
 {
 	return this->number_of_id_entries;
+}
+
+void ResourceDirectory::insert_directory_entry(std::shared_ptr<ResourceDirectoryEntry> p_entry) const
+{
+	this->resource_entries->emplace_back(p_entry);
+}
+
+std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> ResourceDirectory::get_directory_entries()
+{
+	return this->resource_entries;
 }

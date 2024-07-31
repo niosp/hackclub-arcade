@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <vector>
 
+#include "ResourceDirectory.hpp"
+#include "ResourceDirectoryEntry.hpp"
+#include "StoreType.hpp"
+
 const std::string RESET_COLOR = "\033[0m";
 const std::string RED_COLOR = "\033[31m";
 const std::string GREEN_COLOR = "\033[32m";
@@ -455,7 +459,10 @@ int main(int argc, char* argv[])
 
     DWORD ctr = 0;
 
+    std::vector<std::shared_ptr<ResourceDirectory>> parsed_resource_directory;
 
+    auto resource_dir_s = std::make_shared<ResourceDirectory>(dir.Characteristics, dir.TimeDateStamp, dir.MajorVersion, dir.MinorVersion, dir.NumberOfNamedEntries, dir.NumberOfIdEntries);
+    parsed_resource_directory.emplace_back(resource_dir_s);
 
     if (resource_directory.Size != 0)
     {
@@ -465,10 +472,18 @@ int main(int argc, char* argv[])
             std::cout << "\n" << ctr++ << "\n";
             std::cout << "\n\nFOR1: " << dir.NumberOfIdEntries + dir.NumberOfNamedEntries << std::endl;
 
+            /////////////////////
+
             /* get the entry */
             IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1;
             file_stream.seekg(resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
             file_stream.read(reinterpret_cast<char*>(&dir_entry_1), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+            /* insert smart pointer to ResourceDirectoryEntry object into vector */
+            auto dir_entry_1_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_1.Name, dir_entry_1.OffsetToData);
+            resource_dir_s->insert_directory_entry(dir_entry_1_ptr);
+
+            /////////////////////
 
             /* get the directory the entry points to */
             IMAGE_RESOURCE_DIRECTORY dir_1;
@@ -476,21 +491,38 @@ int main(int argc, char* argv[])
             file_stream.seekg(dir_1_offset, std::ios_base::beg);
             file_stream.read(reinterpret_cast<char*>(&dir_1), sizeof(IMAGE_RESOURCE_DIRECTORY));
 
+            auto dir_1_ptr = std::make_shared<ResourceDirectory>(dir_1.Characteristics, dir_1.TimeDateStamp, dir_1.MajorVersion, dir_1.MinorVersion, dir_1.NumberOfNamedEntries, dir_1.NumberOfIdEntries);
+            dir_entry_1_ptr->insert_nested_directory(dir_1_ptr);
+
+            /////////////////////
+
             /* iterate through the directory mentioned in last comment */
             for(int j=0; j < dir_1.NumberOfNamedEntries + dir_1.NumberOfIdEntries; j++)
             {
                 std::cout << "FOR2: " << dir_1.NumberOfNamedEntries + dir_1.NumberOfIdEntries << std::endl;
+
+                /////////////////////
 
                 /* get the directory entry */
                 IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_2;
                 file_stream.seekg(dir_1_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + j * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
                 file_stream.read(reinterpret_cast<char*>(&dir_entry_2), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
+                auto dir_entry_2_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_2.Name, dir_entry_2.OffsetToData);
+                resource_dir_s->insert_directory_entry(dir_entry_2_ptr);
+
+                /////////////////////
+
                 /* get nested resource directory */
                 IMAGE_RESOURCE_DIRECTORY dir_2;
                 DWORD dir_2_offset = dir_entry_2.OffsetToDirectory + resource_offset;
                 file_stream.seekg(dir_2_offset, std::ios_base::beg);
                 file_stream.read(reinterpret_cast<char*>(&dir_2), sizeof(IMAGE_RESOURCE_DIRECTORY));
+
+                auto dir_2_ptr = std::make_shared<ResourceDirectory>(dir_2.Characteristics, dir_2.TimeDateStamp, dir_2.MajorVersion, dir_2.MinorVersion, dir_2.NumberOfNamedEntries, dir_2.NumberOfIdEntries);
+                dir_entry_2_ptr->insert_nested_directory(dir_2_ptr);
+
+                /////////////////////
 
                 /* for every entry in directory dir_2 */
                 for(int k=0; k < dir_2.NumberOfNamedEntries + dir_2.NumberOfIdEntries; k++)
