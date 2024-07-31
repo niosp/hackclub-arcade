@@ -430,30 +430,41 @@ int main(int argc, char* argv[])
     /* .rsrc */
     /* https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#the-rsrc-section */
 
+    /* get the data directory itself */
     IMAGE_DATA_DIRECTORY resource_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE];
    
     DWORD resource_size = resource_directory.Size;
     DWORD resource_rva = resource_directory.VirtualAddress;
 
+    /* convert the rva from resource_directory->VirtualAddress to the file offset (so resource section starts at resource_offset */
     DWORD resource_offset = rva_to_offset(resource_rva, section_headers, number_of_sections);
 
     IMAGE_RESOURCE_DIRECTORY dir;
     file_stream.seekg(resource_offset, std::ios_base::beg);
     file_stream.read(reinterpret_cast<char*>(&dir), sizeof(IMAGE_RESOURCE_DIRECTORY));
 
+    bool end_in_dir_reached = false;
+
+    if (resource_directory.Size != 0)
+    {
+        for (int i=0; i < dir.NumberOfIdEntries + dir.NumberOfNamedEntries; i++)
+        {
+            IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry;
+            file_stream.seekg(resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
+            file_stream.read(reinterpret_cast<char*>(&dir_entry), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
 
 
-    struct ResourceDirectory {
-        DWORD Characteristics;
-        DWORD TimeDateStamp;
-        WORD MajorVersion;
-        WORD MinorVersion;
-        WORD NumberOfNamedEntries;
-        WORD NumberOfIdEntries;
-    };
+            DWORD nested_dir_offset = dir_entry.OffsetToDirectory + resource_offset;
+            IMAGE_RESOURCE_DIRECTORY nested_dir;
+            file_stream.seekg(nested_dir_offset, std::ios_base::beg);
+            file_stream.read(reinterpret_cast<char*>(&nested_dir), sizeof(IMAGE_RESOURCE_DIRECTORY));
 
-    IMAGE_SECTION_HEADER resourceSection;
+
+
+            std::cout << "asd";
+        }
+    }
 
     /* todo: parse resource directory + base relocations */
 
