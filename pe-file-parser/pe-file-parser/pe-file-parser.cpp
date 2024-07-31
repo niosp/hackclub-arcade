@@ -6,7 +6,25 @@
 #include <cstdint>
 #include <vector>
 
+template<typename T>
+T readData(std::ifstream& file) {
+    T data;
+    file.read(reinterpret_cast<char*>(&data), sizeof(T));
+    return data;
+}
 
+struct ResourceDirectory {
+    DWORD Characteristics;
+    DWORD TimeDateStamp;
+    WORD MajorVersion;
+    WORD MinorVersion;
+    WORD NumberOfNamedEntries;
+    WORD NumberOfIdEntries;
+};
+
+void read_resource_directory_entry(std::ifstream& file, IMAGE_RESOURCE_DIRECTORY_ENTRY& entry) {
+    file.read(reinterpret_cast<char*>(&entry), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+}
 
 int locate(DWORD VA, PIMAGE_SECTION_HEADER section_headers, DWORD number_of_sections) {
 
@@ -53,29 +71,6 @@ int locate_virtual_address(DWORD VA, DWORD no_of_sections, IMAGE_SECTION_HEADER 
         }
     }
     return index;
-}
-
-void parse_exports(IMAGE_NT_HEADERS32 parsed_nt_headers) {
-    IMAGE_DATA_DIRECTORY export_data_dir = parsed_nt_headers.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
-    if (export_data_dir.Size == 0) {
-        std::cout << "No export table found." << "\n";
-        return;
-    }
-
-    PIMAGE_EXPORT_DIRECTORY export_directory = (PIMAGE_EXPORT_DIRECTORY)((BYTE*)+ export_data_dir.VirtualAddress);
-
-    DWORD* function_addresses = (DWORD*)((BYTE*)export_data_dir->AddressOfFunctions);
-    DWORD* name_addr = (DWORD*)((BYTE*)export_data_dir->AddressOfNames);
-    WORD* ordinals = (WORD*)((BYTE*)export_data_dir->AddressOfNameOrdinals);
-
-    std::cout << "Exported functions:" << "\n";
-
-    for (DWORD i = 0; i < export_data_dir.NumberOfNames; i++) {
-        char* func_name = (char*)((BYTE*)name_addr[i]);
-        DWORD func_rva = func_addr[ordinals[i]];
-        FARPROC func_adr = (FARPROC)((BYTE*)func_rva);
-        std::cout << "  Function name: " << func_name << ", Address: " << func_rva << "\n";
-    }
 }
 
 int main(int argc, char* argv[])
@@ -262,24 +257,24 @@ int main(int argc, char* argv[])
     }
 
     /*
-        data directories (following section is from winnt.h!) ->
+        data directories (following section is from winnt.h!) -> state: (tba: to be determined, done: done, nr: not required)
 		// Directory Entries
-		#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
-		#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory
-		#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory
-		#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory
-		#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory
-		#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table
-		#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory
-		//      IMAGE_DIRECTORY_ENTRY_COPYRIGHT       7   // (X86 usage)
-		#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data
-		#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP
-		#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory
-		#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory
-		#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
-		#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
-		#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
-		#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptorIMAGE_DATA_DIRECTORY
+		#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory (nr)
+		#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory (done)
+		#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory (todo)
+		#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory (tbd)
+		#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory (nr) -> certs are stored there
+		#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table (todo)
+		#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory (todo)
+		//      IMAGE_DIRECTORY_ENTRY_COPYRIGHT       7   // (X86 usage) (nr)
+		#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data (nr)
+		#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP (nr)
+		#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory (nr fn)
+		#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory (nr)
+		#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers (nr)
+		#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table (nr)
+		#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors (todo)
+		#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptorIMAGE_DATA_DIRECTORY (tbd)
 
 		Development notes:
         - data directories where *Address and *Size are zero, arent used!
@@ -386,9 +381,7 @@ int main(int argc, char* argv[])
             else {
                 /* normal import by name */
                 IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(buffer.data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, number_of_sections));
-                function_names.push_back(import_by_name->Name);
-
-                thunk_data->u1->
+                function_names.emplace_back(import_by_name->Name);
             }
             thunk_data++;
         }
@@ -402,6 +395,57 @@ int main(int argc, char* argv[])
     	import_directory_count++;
     }
 
+    /* parse basereloc */
+
+    IMAGE_DATA_DIRECTORY directory_entry_basereloc_rva = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+    DWORD base_relocation_directory_addr = rva_to_offset(directory_entry_basereloc_rva.VirtualAddress, section_headers, number_of_sections);
+
+    DWORD basereloc_size_counter = 0;
+    DWORD basereloc_directory_counter = 0;
+
+    std::vector<IMAGE_BASE_RELOCATION> base_relocations_vec;
+
+    while(true)
+    {
+        IMAGE_BASE_RELOCATION temp_base_relo;
+
+        DWORD base_relocation_offset = (basereloc_size_counter + base_relocation_directory_addr);
+
+        file_stream.seekg(base_relocation_offset, std::ios_base::beg);
+        file_stream.read(reinterpret_cast<char*>(&temp_base_relo), sizeof(IMAGE_BASE_RELOCATION));
+
+        if(temp_base_relo.SizeOfBlock == 0 && temp_base_relo.VirtualAddress == 0)
+        {
+            break;
+        }
+
+        base_relocations_vec.emplace_back(temp_base_relo);
+
+        basereloc_directory_counter++;
+        basereloc_size_counter += temp_base_relo.SizeOfBlock;
+    }
+
+    /* .rsrc */
+    /* https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#the-rsrc-section */
+
+    struct ResourceDirectory {
+        DWORD Characteristics;
+        DWORD TimeDateStamp;
+        WORD MajorVersion;
+        WORD MinorVersion;
+        WORD NumberOfNamedEntries;
+        WORD NumberOfIdEntries;
+    };
+
+    IMAGE_SECTION_HEADER resourceSection;
+    for (const auto& section : section_headers) {
+        if (std::string(reinterpret_cast<const char*>(section.Name), 8) == ".rsrc") {
+            resourceSection = section;
+            break;
+        }
+    }
+
+    /* todo: parse resource directory + base relocations */
 
     return 0;
 }
