@@ -509,7 +509,7 @@ int main(int argc, char* argv[])
                 file_stream.read(reinterpret_cast<char*>(&dir_entry_2), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
                 auto dir_entry_2_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_2.Name, dir_entry_2.OffsetToData);
-                resource_dir_s->insert_directory_entry(dir_entry_2_ptr);
+                dir_1_ptr->insert_directory_entry(dir_entry_2_ptr);
 
                 /////////////////////
 
@@ -541,12 +541,21 @@ int main(int argc, char* argv[])
                     file_stream.seekg(dir_2_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + k * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
                     file_stream.read(reinterpret_cast<char*>(&dir_entry_3), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
+                    auto dir_entry_3_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_3.Name, dir_entry_3.OffsetToData);
+                    dir_2_ptr->insert_directory_entry(dir_entry_3_ptr);
+
+                    IMAGE_RESOURCE_DATA_ENTRY
+
+
+
                     /* todo: get the resource data entry pointed to by dir_entry_3->OffsetToData */
                     /* todo: print nice tree structure */
                 }
 
             }
         }
+
+        std::cout << "asd" << std::endl;
     }
 
     /* todo: parse resource directory + base relocations */

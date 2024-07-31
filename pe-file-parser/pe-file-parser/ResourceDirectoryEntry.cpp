@@ -8,6 +8,7 @@ ResourceDirectoryEntry::ResourceDirectoryEntry(DWORD p_name, DWORD p_offset_to_d
 {
 	this->name = p_name;
 	this->offset_to_data = p_offset_to_data;
+	this->nested_directories = std::make_shared<std::vector<std::shared_ptr<ResourceDirectory>>>();
 }
 
 DWORD ResourceDirectoryEntry::get_data_is_directory() const

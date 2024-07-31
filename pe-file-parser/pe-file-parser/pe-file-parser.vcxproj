@@ -128,10 +128,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="pe-file-parser.cpp" />
+    <ClCompile Include="ResourceData.cpp" />
     <ClCompile Include="ResourceDirectory.cpp" />
     <ClCompile Include="ResourceDirectoryEntry.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ResourceData.hpp" />
     <ClInclude Include="ResourceDirectory.hpp" />
     <ClInclude Include="ResourceDirectoryEntry.hpp" />
   </ItemGroup>
