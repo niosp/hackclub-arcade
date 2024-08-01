@@ -1,7 +1,8 @@
 #include "ResourceDirectory.hpp"
-#include "ResourceDirectoryEntry.hpp"
 
 #include <windows.h>
+
+class ResourceDirectoryEntry;
 
 ResourceDirectory::ResourceDirectory(DWORD p_characteristics, DWORD p_time_date_stamp, WORD p_major_version, WORD p_minor_version, WORD p_number_of_named_entries, WORD p_number_of_id_entries)
 {

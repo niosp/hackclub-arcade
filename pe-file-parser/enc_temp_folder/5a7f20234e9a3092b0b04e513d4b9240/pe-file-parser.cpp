@@ -598,6 +598,8 @@ int main(int argc, char* argv[])
         }
     }
 
+
+
     /* parse debug information (from directory) */
 
     IMAGE_DATA_DIRECTORY debug_directory= parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
@@ -608,6 +610,9 @@ int main(int argc, char* argv[])
 
     file_stream.seekg(debug_directory_rva, std::ios_base::beg);
     file_stream.read(reinterpret_cast<char*>(&debug_dir_inst), sizeof(IMAGE_DEBUG_DIRECTORY));
+
+
+
 
     return 0;
 }

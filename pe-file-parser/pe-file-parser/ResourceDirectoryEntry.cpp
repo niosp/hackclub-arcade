@@ -1,8 +1,9 @@
 #include "ResourceDirectoryEntry.hpp"
-#include "ResourceDirectory.hpp"
 
 #include <bitset>
 
+class ResourceDirectory;
+class ResourceData;
 
 ResourceDirectoryEntry::ResourceDirectoryEntry(DWORD p_name, DWORD p_offset_to_data)
 {
@@ -54,6 +55,16 @@ std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> ResourceDirecto
 DWORD ResourceDirectoryEntry::get_offset_to_directory() const
 {
 	return (this->offset_to_data & 0x7FFFFFFF);
+}
+
+std::shared_ptr<ResourceData> ResourceDirectoryEntry::get_stored_resource_data() const
+{
+	return this->resource_data;
+}
+
+void ResourceDirectoryEntry::insert_resource_data(std::shared_ptr<ResourceData> p_resource_data)
+{
+	this->resource_data = p_resource_data;
 }
 
 
