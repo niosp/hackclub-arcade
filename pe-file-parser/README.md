@@ -3,9 +3,7 @@ Parser for 32bit windows PE files
 ### Features
 This utility parses the following:
 - DOS header
-- NT headers (required ones
-
-)
+- NT headers (required ones)
 - Optional NT headers (the ones required by windows pe loader etc.)
 - Section headers and section details
 - The imports:
