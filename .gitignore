@@ -2,3 +2,5 @@
 /http-server/cmake-build-release/
 /pe-file-parser/.vs/
 /chip8-emulator/.vs/
+/chip8-emulator/.vs/*
+chip8-emulator/.vs/*
