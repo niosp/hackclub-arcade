@@ -1,0 +1,5 @@
+﻿  chip8-emulator.cpp
+C:\Users\User\Desktop\hackclub-arcade\chip8-emulator\chip8-emulator.cpp(129,29): warning C4101: 'registers': unreferenced local variable
+  chip8-emulator.vcxproj -> C:\Users\User\Desktop\hackclub-arcade\chip8-emulator\x64\Debug\chip8-emulator.exe
+  'pwsh.exe' is not recognized as an internal or external command,
+  operable program or batch file.
