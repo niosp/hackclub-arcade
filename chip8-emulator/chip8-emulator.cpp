@@ -20,7 +20,7 @@ const int default_color_b = 82;
 
 const int entry_point = 0x200;
 
-uint8_t display[EMULATOR_WIDTH * SCALE_FACTOR][EMULATOR_HEIGHT * SCALE_FACTOR] = {0};
+uint8_t display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = {};
 
 const uint8_t font_data[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
