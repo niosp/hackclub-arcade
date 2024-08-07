@@ -10,7 +10,7 @@
 #include <iomanip>
 #include <sstream>
 
-const int SCALE_FACTOR = 15;
+const int SCALE_FACTOR = 1;
 const int EMULATOR_WIDTH = 64;
 const int EMULATOR_HEIGHT = 32;
 
@@ -18,9 +18,9 @@ const int default_color_r = 255;
 const int default_color_g = 255;
 const int default_color_b = 255;
 
-const int entry_point = 0x00;
+const int entry_point = 0x200;
 
-uint8_t display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = {0};
+uint8_t display[EMULATOR_WIDTH * SCALE_FACTOR][EMULATOR_HEIGHT * SCALE_FACTOR] = {0};
 
 const uint8_t font_data[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -60,45 +60,6 @@ enum register_enum
     VE = 0x0E,
     VF = 0x0F /* flag register */
 };
-
-bool is_pixel_black(SDL_Texture* texture, int x, int y)
-{
-    // Get texture format and size
-    Uint32 format;
-    int access, w, h;
-    SDL_QueryTexture(texture, &format, &access, &w, &h);
-
-    // Make sure the coordinates are within bounds
-    if (x < 0 || x >= w || y < 0 || y >= h) {
-        std::cerr << "Coordinates are out of bounds." << std::endl;
-        return false;
-    }
-
-    // Lock the texture
-    void* pixels;
-    int pitch;
-    if (SDL_LockTexture(texture, NULL, &pixels, &pitch) != 0) {
-        std::cerr << "Failed to lock texture: " << SDL_GetError() << std::endl;
-        return false;
-    }
-
-    // Calculate the position of the pixel
-    Uint32* pixelArray = (Uint32*)pixels;
-    int pixelIndex = (y * pitch / 4) + x;
-    Uint32 pixelValue = pixelArray[pixelIndex];
-
-    // Unlock the texture
-    SDL_UnlockTexture(texture);
-
-    // Extract color components
-    Uint8 r, g, b, a;
-    SDL_PixelFormat* pixelFormat = SDL_AllocFormat(format);
-    SDL_GetRGBA(pixelValue, pixelFormat, &r, &g, &b, &a);
-    SDL_FreeFormat(pixelFormat);
-
-    // Check if the pixel is black (assuming black means all color components are 0)
-    return (r == 0 && g == 0 && b == 0);
-}
 
 uint16_t read_2_bytes(std::vector<uint8_t>& memory, uint32_t index) {
     if (index + 1 >= memory.size()) {
@@ -342,31 +303,36 @@ int main(int argc, char* argv[]) {
                         uint8_t pixel_x = x_coordinate + col;
                         uint8_t pixel_y = y_coordinate + row;
 
-                        uint8_t current_pixel = (sprite_data & (1 << col)) >> col;
+                        uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
 
                         if(pixel_x >= 64 || pixel_y >= 32)
                         {
                             std::cout << "Out of range. Break.\n";
                         }else
                         {
-	                        if(current_pixel && display[pixel_x][pixel_y])
+	                        if(current_pixel && display[pixel_x * SCALE_FACTOR][pixel_y * SCALE_FACTOR])
 	                        {
                                 registers[VF] = 0x01;
-	                        }else if(current_pixel && !(display[pixel_x][pixel_y]))
+	                        }else if(!(display[pixel_x][pixel_y]))
 	                        {
                                 SDL_Rect rectangle;
-                                rectangle.x = pixel_x;
-                                rectangle.y = pixel_y;
-                                rectangle.h = 1;
-                                rectangle.w = 1;
+                                rectangle.x = pixel_x * SCALE_FACTOR;
+                                rectangle.y = pixel_y * SCALE_FACTOR;
+                                rectangle.h = SCALE_FACTOR;
+                                rectangle.w = SCALE_FACTOR;
 
-                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 255, 255);
+                                SDL_SetRenderDrawColor(sdl_renderer, 100, 0, 0, 0);
                                 SDL_RenderFillRect(sdl_renderer, &rectangle);
 	                        	SDL_RenderPresent(sdl_renderer);
+                                display[pixel_x][pixel_y] = 1;
 	                        }
                         }
 	                }
+
                 }
+
+
+
         		break;
 	        }
         default:
