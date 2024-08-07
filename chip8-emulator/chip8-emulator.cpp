@@ -61,13 +61,27 @@ enum register_enum
     VF = 0x0F /* flag register */
 };
 
+void print_current_state_to_console() {
+    for (int y = 0; y < EMULATOR_HEIGHT; ++y) {
+        for (int x = 0; x < EMULATOR_WIDTH; ++x) {
+            if (display[x][y] == 1) {
+                std::cout << '#';
+            }
+            else {
+                std::cout << '.';
+            }
+        }
+        std::cout << "\n";
+    }
+	std::cout << "\n\n";
+}
+
 uint16_t read_2_bytes(std::vector<uint8_t>& memory, uint32_t index) {
     if (index + 1 >= memory.size()) {
         throw std::out_of_range("Index out of bounds!!!");
     }
     return (static_cast<uint16_t>(memory[index]) << 8) | static_cast<uint16_t>(memory[index + 1]);
 }
-
 
 int8_t init_sdl()
 {
@@ -300,34 +314,40 @@ int main(int argc, char* argv[]) {
                     /* draw 8 pixels for each row */
 	                for(uint8_t col=0; col < 8; col++)
 	                {
-                        uint8_t pixel_x = x_coordinate + col;
-                        uint8_t pixel_y = y_coordinate + row;
+                        uint8_t pixel_x = (x_coordinate + col) % EMULATOR_WIDTH;
+                        uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
 
                         uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
 
-                        if(pixel_x >= 64 || pixel_y >= 32)
-                        {
-                            std::cout << "Out of range. Break.\n";
-                        }else
-                        {
-	                        if(current_pixel && display[pixel_x * SCALE_FACTOR][pixel_y * SCALE_FACTOR])
+
+	                        if(current_pixel && display[pixel_x][pixel_y])
 	                        {
                                 registers[VF] = 0x01;
-	                        }else if(!(display[pixel_x][pixel_y]))
-	                        {
+	                        }
                                 SDL_Rect rectangle;
-                                rectangle.x = pixel_x * SCALE_FACTOR;
-                                rectangle.y = pixel_y * SCALE_FACTOR;
-                                rectangle.h = SCALE_FACTOR;
-                                rectangle.w = SCALE_FACTOR;
+                                rectangle.x = pixel_x;
+                                rectangle.y = pixel_y;
+                                rectangle.h = 1;
+                                rectangle.w = 1;
 
                                 SDL_SetRenderDrawColor(sdl_renderer, 100, 0, 0, 0);
                                 SDL_RenderFillRect(sdl_renderer, &rectangle);
 	                        	SDL_RenderPresent(sdl_renderer);
-                                display[pixel_x][pixel_y] = 1;
-	                        }
+                                display[pixel_x][pixel_y] ^= 1;
+                        /*
+                        if (current_pixel)
+                        {
+                            if (display[pixel_x][pixel_y] == 1)
+                            {
+                                registers[VF] = 0x01;
+                            }
+                            display[pixel_x][pixel_y] ^= 1;
                         }
+                        */
+
 	                }
+
+                    print_current_state_to_console();
 
                 }
 

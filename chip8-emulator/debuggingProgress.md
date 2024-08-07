@@ -6,3 +6,7 @@ Added checks to disable out-of-bounds write (screenshot line 347)
 
 ![Drawing Processor](image.png)
 
+
+The next problem:
+
+![Bigger window, rectangle size of 1*1px is much larger being displayed (lol?)](image-2.png)
