@@ -10,13 +10,13 @@
 #include <iomanip>
 #include <sstream>
 
-const int SCALE_FACTOR = 1;
+const int SCALE_FACTOR = 10;
 const int EMULATOR_WIDTH = 64;
 const int EMULATOR_HEIGHT = 32;
 
-const int default_color_r = 255;
-const int default_color_g = 255;
-const int default_color_b = 255;
+const int default_color_r = 0;
+const int default_color_g = 5;
+const int default_color_b = 82;
 
 const int entry_point = 0x200;
 
@@ -209,11 +209,11 @@ int main(int argc, char* argv[]) {
 
     std::array<uint8_t, 16> registers = {0};
 
-    int16_t register_PC = entry_point;
-    int16_t register_I = 0;
+    uint16_t register_PC = entry_point;
+    uint16_t register_I = 0;
 
-    int8_t delay_timer = 0;
-    int8_t sound_timer = 0;
+    uint8_t delay_timer = 0;
+    uint8_t sound_timer = 0;
 
     std::stack<uint16_t> program_stack = {};
 
@@ -234,6 +234,10 @@ int main(int argc, char* argv[]) {
     while(register_PC + 1 < file_content.size())
     {
         SDL_PollEvent(&e);
+        if(e.type == SDL_QUIT)
+        {
+            return 0;
+        }
 	    /* fetch instruction */
         uint16_t instruction = (file_content[register_PC] << 8) | file_content[register_PC + 1];
         uint8_t inst_first = file_content[register_PC];
@@ -319,21 +323,44 @@ int main(int argc, char* argv[]) {
 
                         uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
 
-
-	                        if(current_pixel && display[pixel_x][pixel_y])
-	                        {
+                        /*
+                        if(current_pixel)
+                        {
+                            if (display[pixel_x][pixel_y])
+                            {
                                 registers[VF] = 0x01;
-	                        }
-                                SDL_Rect rectangle;
-                                rectangle.x = pixel_x;
-                                rectangle.y = pixel_y;
-                                rectangle.h = 1;
-                                rectangle.w = 1;
+                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
+                            }
+                            SDL_Rect rectangle;
+                            rectangle.x = pixel_x;
+                            rectangle.y = pixel_y;
+                            rectangle.h = 1;
+                            rectangle.w = 1;
 
-                                SDL_SetRenderDrawColor(sdl_renderer, 100, 0, 0, 0);
-                                SDL_RenderFillRect(sdl_renderer, &rectangle);
-	                        	SDL_RenderPresent(sdl_renderer);
-                                display[pixel_x][pixel_y] ^= 1;
+                            SDL_SetRenderDrawColor(sdl_renderer, 100, 0, 0, 0);
+                            SDL_RenderFillRect(sdl_renderer, &rectangle);
+                            SDL_RenderPresent(sdl_renderer);
+                            display[pixel_x][pixel_y] ^= 1;
+                        }
+                        */
+
+                        if (current_pixel && display[pixel_x][pixel_y])
+                        {
+                            registers[VF] = 0x01;
+                        }
+                        else if (current_pixel && !(display[pixel_x][pixel_y]))
+                        {
+                            SDL_Rect rectangle;
+                            rectangle.x = pixel_x * SCALE_FACTOR;
+                            rectangle.y = pixel_y * SCALE_FACTOR;
+                            rectangle.h = SCALE_FACTOR;
+                            rectangle.w = SCALE_FACTOR;
+
+                            SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
+                            SDL_RenderFillRect(sdl_renderer, &rectangle);
+                            SDL_RenderPresent(sdl_renderer);
+                            display[pixel_x][pixel_y] = 1;
+                        }
                         /*
                         if (current_pixel)
                         {
@@ -346,13 +373,7 @@ int main(int argc, char* argv[]) {
                         */
 
 	                }
-
-                    print_current_state_to_console();
-
                 }
-
-
-
         		break;
 	        }
         default:
@@ -361,7 +382,7 @@ int main(int argc, char* argv[]) {
         		break;
 	        }
         }
-
+        Sleep(300);
         register_PC += 2;
     }
 
