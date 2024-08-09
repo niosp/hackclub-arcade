@@ -107,3 +107,7 @@ Fixed some registers but had to rollback the image drawing function, but now spa
 
 
  Continue to investigate the issues
+
+ ### Fixed the carry flag issue (partial)
+
+ ![Carry flag issues](image-7.png)
