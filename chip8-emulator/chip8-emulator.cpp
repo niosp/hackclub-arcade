@@ -369,6 +369,8 @@ int main(int argc, char* argv[]) {
         uint8_t nibble_3 = inst_second >> 4;
         uint8_t nibble_4 = inst_second & 15;
 
+        bool increase_pc = true;
+
         /* switch over the first nibble */
         switch(instruction & 0xF000)
         {
@@ -410,7 +412,7 @@ int main(int argc, char* argv[]) {
         case 0x1000:
 	        {
         		register_PC = instruction & 0x0FFF;
-                register_PC -= 2;
+                increase_pc = false;
                 log("1NNN");
                 break;
 	        }
@@ -418,7 +420,7 @@ int main(int argc, char* argv[]) {
 	        {
 				program_stack.push(register_PC);
                 register_PC = instruction & 0x0FFF;
-                register_PC -= 2;
+                increase_pc = false;
                 log("2NNN");
         		break;
 	        }
@@ -490,13 +492,17 @@ int main(int argc, char* argv[]) {
                     log("8XY4");
                 }else if (nibble_4 == 0x05)
                 {
+
+                    uint8_t req_bit = (registers[nibble_2] < 0) ? 0x00 : 0x01;
                     registers[nibble_2] -= registers[nibble_3];
-                    registers[VF] = (registers[nibble_2] > registers[nibble_3]) ? 0x01 : 0x00;
+                    registers[VF] = req_bit;
                     log("8XY5");
+
                 }else if (nibble_4 == 0x06) /* working */
                 {
-                    registers[VF] = registers[nibble_2] & 0x01;
-                    registers[nibble_2] >>= 1;
+                    uint8_t lsb = registers[nibble_2] & 0x01;
+                    registers[nibble_2] = registers[nibble_2] >> 1;
+                    registers[VF] = lsb;
                     log("8XY6");
                 }else if(nibble_4 == 0x07)
                 {
@@ -505,8 +511,9 @@ int main(int argc, char* argv[]) {
                     log("8XY7");
                 }else if(nibble_4 == 0x0e) /* working */
                 {
-                    registers[VF] = (registers[nibble_2] & 0x80) ? 1 : 0;
+                    uint8_t req_bit = (registers[nibble_2] & 0x80) ? 1 : 0;
                     registers[nibble_2] <<= 1;
+                    registers[VF] = req_bit;
                     log("8XYE");
                 }
 				break;
@@ -529,7 +536,7 @@ int main(int argc, char* argv[]) {
         case 0xB000:
 	        {
 				register_PC = registers[V0] + (instruction & 0x0FFF);
-                register_PC -= 2;
+                increase_pc = false;
                 log("BNNN");
 				break;
 	        }
@@ -563,6 +570,7 @@ int main(int argc, char* argv[]) {
                         {
                             if (display[pixel_x][pixel_y]) {
                                 registers[VF] = 0x01;
+                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
                             }
                             SDL_Rect rectangle;
                             rectangle.x = pixel_x * SCALE_FACTOR;
@@ -633,6 +641,7 @@ int main(int argc, char* argv[]) {
                     log("FX65");
 				}else if(inst_second == 0x07)
 				{
+                    registers[nibble_2] = delay_timer;
                     log("FX07");
                     break;
 				}else if(inst_second == 0x0a)
@@ -641,10 +650,12 @@ int main(int argc, char* argv[]) {
                     break;
 				}else if(inst_second == 0x15)
 				{
+                    delay_timer = registers[nibble_2];
                     log("FX15");
                     break;
 				}else if(inst_second == 0x18)
 				{
+                    sound_timer = registers[nibble_2];
                     log("FX18");
                     break;
 				}
@@ -656,8 +667,10 @@ int main(int argc, char* argv[]) {
         		break;
 	        }
         }
-        register_PC += 2;
+        if(increase_pc) register_PC += 2;
         instructions += 1;
+        if(delay_timer > 0) delay_timer -= 1;
+        if (sound_timer > 0) sound_timer -= 1;
     }
 
     end:
