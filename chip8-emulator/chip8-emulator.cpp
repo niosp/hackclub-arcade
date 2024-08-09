@@ -555,30 +555,37 @@ int main(int argc, char* argv[]) {
 	                /* draw 8 pixels for each row */
 	                for (uint8_t col = 0; col < 8; col++)
 	                {
-	                    uint8_t pixel_x = (x_coordinate + col) % EMULATOR_WIDTH;
-	                    uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
+                        uint8_t pixel_x = (x_coordinate + col) % EMULATOR_WIDTH;
+                        uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
 
-	                    uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
+                        uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
 
-	                    if (current_pixel)
-	                    {
-	                        if (display[pixel_x][pixel_y]) {
-	                            registers[VF] = 0x01;
-	                            SDL_SetRenderDrawColor(sdl_renderer, 40, 0, 0, 255);
-	                        }else
-	                        {
-                                SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 255);
-	                        }
-	                        SDL_Rect rectangle;
-	                        rectangle.x = pixel_x * SCALE_FACTOR;
-	                        rectangle.y = pixel_y * SCALE_FACTOR;
-	                        rectangle.h = SCALE_FACTOR;
-	                        rectangle.w = SCALE_FACTOR;
+                        if (current_pixel != 0) {
+                            if (display[pixel_x][pixel_y] == 1)
+                                registers[VF] = 0x01;
+                            display[pixel_x][pixel_y] ^= 1;
+                        }
 
-	                        SDL_RenderFillRect(sdl_renderer, &rectangle);
-	                        display[pixel_x][pixel_y] ^= 1;
-	                    }
+                        /* prepare rendering */
+
+                        SDL_Rect rectangle;
+                        rectangle.x = pixel_x * SCALE_FACTOR;
+                        rectangle.y = pixel_y * SCALE_FACTOR;
+                        rectangle.w = SCALE_FACTOR;
+                        rectangle.h = SCALE_FACTOR;
+
+                        if(display[pixel_x][pixel_y])
+                        {
+                            SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
+                        }else
+                        {
+                            SDL_SetRenderDrawColor(sdl_renderer, 10, 0, 0, 255);
+                        }
+
+                        SDL_RenderFillRect(sdl_renderer, &rectangle);
 	                }
+                    print_current_state_to_console();
+                    Sleep(20);
 	            }
 	            break;
 	        }
@@ -662,9 +669,10 @@ int main(int argc, char* argv[]) {
         }
         if(increase_pc) register_PC += 2;
         instructions += 1;
-        // if(delay_timer > 0) delay_timer -= 1;
-        // if (sound_timer > 0) sound_timer -= 1;
+        if(delay_timer > 0) delay_timer -= 1;
+        if (sound_timer > 0) sound_timer -= 1;
         SDL_RenderPresent(sdl_renderer);
+        Sleep(1);
     }
 
     end:
