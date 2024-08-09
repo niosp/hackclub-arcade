@@ -283,16 +283,6 @@ int main(int argc, char* argv[]) {
 	int* size = nullptr;
     const Uint8* keyboard_state = SDL_GetKeyboardState(size);
 
-    /*
-    void* pixels;
-    int pitch;
-    if (SDL_LockTexture(sdl_texture, NULL, &pixels, &pitch) != 0) {
-        std::cerr << "Failed to lock texture! SDL_Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return 1;
-    }
-    */
-
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
     SDL_RenderClear(sdl_renderer);
     SDL_RenderPresent(sdl_renderer);
@@ -465,60 +455,6 @@ int main(int argc, char* argv[]) {
                 log("7XNN");
         		break;
 	        }
-        case 0x8000:
-	        {
-                if(nibble_4 == 0x00) 
-                {
-                    registers[nibble_2] = registers[nibble_3];
-                    log("8XY0");
-                }
-                else if(nibble_4 == 0x01) /* working */
-                {
-                    registers[nibble_2] |= registers[nibble_3];
-                    log("8XY1");
-                }else if(nibble_4 == 0x02) /* working */
-                {
-                    registers[nibble_2] &= registers[nibble_3];
-                    log("8XY2");
-                }
-                else if (nibble_4 == 0x03) /* working */
-                {
-                    registers[nibble_2] ^= registers[nibble_3];
-                    log("8XY3");
-                }else if (nibble_4 == 0x04) /* working */
-                {
-                    size_t sum = registers[nibble_2] + registers[nibble_3];
-                    registers[nibble_2] = sum & 0xFF;
-                    registers[VF] = (sum > 255) ? 0x01 : 0x00;
-                    log("8XY4");
-                }else if (nibble_4 == 0x05)
-                {
-
-                    uint8_t req_bit = (registers[nibble_2] < 0) ? 0x00 : 0x01;
-                    registers[nibble_2] -= registers[nibble_3];
-                    registers[VF] = req_bit;
-                    log("8XY5");
-
-                }else if (nibble_4 == 0x06) /* working */
-                {
-                    uint8_t lsb = registers[nibble_2] & 0x01;
-                    registers[nibble_2] = registers[nibble_2] >> 1;
-                    registers[VF] = lsb;
-                    log("8XY6");
-                }else if(nibble_4 == 0x07)
-                {
-                    registers[nibble_2] = registers[nibble_3] - registers[nibble_2];
-                    registers[VF] = (registers[nibble_3] >= registers[nibble_2]) ? 0x01 : 0x00;
-                    log("8XY7");
-                }else if(nibble_4 == 0x0e) /* working */
-                {
-                    uint8_t req_bit = (registers[nibble_2] & 0x80) ? 1 : 0;
-                    registers[nibble_2] <<= 1;
-                    registers[VF] = req_bit;
-                    log("8XYE");
-                }
-				break;
-	        }
         case 0x9000:
 	        {
 		        if(nibble_4 == 0 && (registers[nibble_2] != registers[nibble_3]))
@@ -549,44 +485,46 @@ int main(int argc, char* argv[]) {
 	        }
         case 0xD000:
 	        {
-        		const uint8_t x_coordinate = registers[nibble_2];
-                const uint8_t y_coordinate = registers[nibble_3];
-                const uint8_t height = nibble_4;
+	            const uint8_t x_coordinate = registers[nibble_2];
+	            const uint8_t y_coordinate = registers[nibble_3];
+	            const uint8_t height = nibble_4;
 
-                registers[VF] = 0x00;
+	            registers[VF] = 0x00;
 
-                /* draw "row" rows until height is reached */
-                for(uint8_t row=0; row < height; row++)
-                {
-                    uint8_t sprite_data = file_content[register_I + row];
-
-                    /* draw 8 pixels for each row */
-	                for(uint8_t col=0; col < 8; col++)
+	            /* draw "row" rows until height is reached */
+	            for (uint8_t row = 0; row < height; row++)
+	            {
+	                uint8_t sprite_data = file_content[register_I + row];
+	                /* draw 8 pixels for each row */
+	                for (uint8_t col = 0; col < 8; col++)
 	                {
-                        uint8_t pixel_x = (x_coordinate + col) % EMULATOR_WIDTH;
-                        uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
+	                    uint8_t pixel_x = (x_coordinate + col) % EMULATOR_WIDTH;
+	                    uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
 
-                        uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
-                        uint8_t pixel_on = display[pixel_x][pixel_y];
+	                    uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
 
-                        if(current_pixel)
-                        {
-                            if (pixel_on) {
-                                registers[VF] = 0x01;
-                                SDL_Rect rectangle;
-                                rectangle.x = pixel_x * SCALE_FACTOR;
-                                rectangle.y = pixel_y * SCALE_FACTOR;
-                                rectangle.h = SCALE_FACTOR;
-                                rectangle.w = SCALE_FACTOR;
+	                    if (current_pixel)
+	                    {
+	                        if (display[pixel_x][pixel_y]) {
+	                            registers[VF] = 0x01;
+	                            SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
+	                        }else
+	                        {
+	                            SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
+	                        }
+	                        SDL_Rect rectangle;
+	                        rectangle.x = pixel_x * SCALE_FACTOR;
+	                        rectangle.y = pixel_y * SCALE_FACTOR;
+	                        rectangle.h = SCALE_FACTOR;
+	                        rectangle.w = SCALE_FACTOR;
 
-                                SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
-                                SDL_RenderFillRect(sdl_renderer, &rectangle);
-                                display[pixel_x][pixel_y] = 0;
-                            }
-                        }else if(current_pixel && !pixel_on)
+	                        SDL_RenderFillRect(sdl_renderer, &rectangle);
+	                        SDL_RenderPresent(sdl_renderer);
+	                        display[pixel_x][pixel_y] ^= 1;
+	                    }
 	                }
-                }
-        		break;
+	            }
+	            break;
 	        }
         case 0xE000:
 	        {
@@ -671,6 +609,7 @@ int main(int argc, char* argv[]) {
         if(delay_timer > 0) delay_timer -= 1;
         if (sound_timer > 0) sound_timer -= 1;
         SDL_RenderPresent(sdl_renderer);
+        Sleep(50);
     }
 
     end:

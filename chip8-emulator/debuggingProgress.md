@@ -95,3 +95,15 @@ Font error has to be fixed in the next lession.
 Problem to be solved first:
 
 ![Wrong texture drawing](image-6.png)
+
+### New Problems
+
+Fixed some registers but had to rollback the image drawing function, but now space invaders soo
+
+![alt text](<Screenshot 2024-08-09 203705.png>)
+
+
+ ![alt text](<Screenshot 2024-08-09 203655.png>)
+
+
+ Continue to investigate the issues
