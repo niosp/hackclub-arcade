@@ -91,3 +91,7 @@ Font error has to be fixed in the next lession.
 ### Debugging the flag issues
 
 ![Flag issues to be resolved](image-5.png)
+
+Problem to be solved first:
+
+![Wrong texture drawing](image-6.png)

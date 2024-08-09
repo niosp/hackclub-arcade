@@ -354,6 +354,7 @@ int main(int argc, char* argv[]) {
     while(register_PC + 1 < file_content.size())
     {
         SDL_PollEvent(&e);
+        SDL_PumpEvents();
         if(e.type == SDL_QUIT)
         {
             goto end;
@@ -558,6 +559,7 @@ int main(int argc, char* argv[]) {
                 for(uint8_t row=0; row < height; row++)
                 {
                     uint8_t sprite_data = file_content[register_I + row];
+
                     /* draw 8 pixels for each row */
 	                for(uint8_t col=0; col < 8; col++)
 	                {
@@ -565,24 +567,23 @@ int main(int argc, char* argv[]) {
                         uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
 
                         uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
+                        uint8_t pixel_on = display[pixel_x][pixel_y];
 
                         if(current_pixel)
                         {
-                            if (display[pixel_x][pixel_y]) {
+                            if (pixel_on) {
                                 registers[VF] = 0x01;
-                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
-                            }
-                            SDL_Rect rectangle;
-                            rectangle.x = pixel_x * SCALE_FACTOR;
-                            rectangle.y = pixel_y * SCALE_FACTOR;
-                            rectangle.h = SCALE_FACTOR;
-                            rectangle.w = SCALE_FACTOR;
+                                SDL_Rect rectangle;
+                                rectangle.x = pixel_x * SCALE_FACTOR;
+                                rectangle.y = pixel_y * SCALE_FACTOR;
+                                rectangle.h = SCALE_FACTOR;
+                                rectangle.w = SCALE_FACTOR;
 
-                            SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
-                            SDL_RenderFillRect(sdl_renderer, &rectangle);
-                            SDL_RenderPresent(sdl_renderer);
-                            display[pixel_x][pixel_y] ^= 1;
-                        }
+                                SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
+                                SDL_RenderFillRect(sdl_renderer, &rectangle);
+                                display[pixel_x][pixel_y] = 0;
+                            }
+                        }else if(current_pixel && !pixel_on)
 	                }
                 }
         		break;
@@ -591,7 +592,6 @@ int main(int argc, char* argv[]) {
 	        {
 		        if(inst_second == 0x9e)
 		        {
-                    SDL_PumpEvents();
                     if(keyboard_state[get_keycode_for_chipkey(registers[nibble_2])])
                     {
                         register_PC += 2;
@@ -599,7 +599,6 @@ int main(int argc, char* argv[]) {
                     log("EX9E");
 		        }else if(inst_second == 0xa1)
 		        {
-                    SDL_PumpEvents();
                     if (!keyboard_state[get_keycode_for_chipkey(registers[nibble_2])])
                     {
                         register_PC += 2;
@@ -671,6 +670,7 @@ int main(int argc, char* argv[]) {
         instructions += 1;
         if(delay_timer > 0) delay_timer -= 1;
         if (sound_timer > 0) sound_timer -= 1;
+        SDL_RenderPresent(sdl_renderer);
     }
 
     end:
