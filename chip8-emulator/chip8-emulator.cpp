@@ -1,4 +1,5 @@
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -8,7 +9,18 @@
 #include <vector>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 #include <sstream>
+
+uint8_t thread_running = 0;
+
+uint8_t delay_timer;
+uint8_t sound_timer;
+
+std::thread timer_thread;
+std::mutex timer_mutex;
+
+uint8_t logging_enabled = 1;
 
 const int SCALE_FACTOR = 10;
 const int EMULATOR_WIDTH = 64;
@@ -19,8 +31,11 @@ const int default_color_g = 5;
 const int default_color_b = 82;
 
 const int entry_point = 0x200;
+const int font_loaded_at = 0x050;
 
 uint8_t display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = {};
+
+uint8_t keys[322] = {0};
 
 const uint8_t font_data[80] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -60,6 +75,80 @@ enum register_enum
     VE = 0x0E,
     VF = 0x0F /* flag register */
 };
+
+void timer_loop() {
+    auto last_update_time = std::chrono::steady_clock::now();
+
+    while (true) {
+        std::cout << "thread running\n";
+        std::unique_lock<std::mutex> lock(timer_mutex);
+
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update_time).count();
+
+        if (elapsed >= 16) {
+            if (delay_timer > 0) {
+                --delay_timer;
+            }
+
+            if (sound_timer > 0) {
+                if (--sound_timer == 0) {
+                    std::cout << "sound timer reached 0\n";
+                }
+            }
+
+            last_update_time = now;
+        }
+        lock.unlock();
+    }
+}
+
+void log(const char* logging_text)
+{
+    if (logging_enabled) std::printf("[LOG] %s\n", logging_text);
+}
+
+uint16_t get_keycode_for_chipkey(uint8_t chipkey)
+{
+	switch(chipkey)
+	{
+	case 0x00:
+        return SDL_SCANCODE_1;
+	case 0x01:
+        return SDL_SCANCODE_2;
+	case 0x02:
+        return SDL_SCANCODE_3;
+	case 0x03:
+        return SDL_SCANCODE_4;
+	case 0x04:
+        return SDL_SCANCODE_Q;
+	case 0x05:
+        return SDL_SCANCODE_W;
+	case 0x06:
+        return SDL_SCANCODE_E;
+	case 0x07:
+        return SDL_SCANCODE_R;
+	case 0x08:
+        return SDL_SCANCODE_A;
+	case 0x09:
+        return SDL_SCANCODE_S;
+	case 0xa:
+        return SDL_SCANCODE_D;
+	case 0xb:
+        return SDL_SCANCODE_F;
+	case 0xc:
+        return SDL_SCANCODE_Z;
+	case 0xd:
+        return SDL_SCANCODE_X;
+	case 0xe:
+        return SDL_SCANCODE_C;
+	case 0xf:
+        return SDL_SCANCODE_V;
+	default:
+        log("requested key that does not exist");
+        return 0;
+	}
+}
 
 void print_current_state_to_console() {
     for (int y = 0; y < EMULATOR_HEIGHT; ++y) {
@@ -119,18 +208,34 @@ int8_t set_pixel(Uint32* pixelData, int pitch, int x, int y, int r, int g, int b
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) return 0;
+    std::string input_filename;
+    if (argc < 2)
+    {
+        std::cout << "Filepath: ";
+        std::cin >> input_filename;
+    }else
+    {
+        input_filename = argv[1];
+    }
+
     /* print filename */
-    std::cout << argv[1] << "\n";
+    log(argv[1]);
+
 	/* prepare file operations */
-    std::ifstream input_file(argv[1], std::ios::binary | std::ios::ate);
+    std::ifstream input_file(input_filename, std::ios::binary | std::ios::ate);
     const std::streamsize file_size = input_file.tellg();
+
     /* check filesize, since memory is limited */
-    if (file_size > 3584) return -1;
+    if (file_size > (4096 - entry_point)) {
+        std::cerr << "ROM size is too large to fit in memory\n";
+        return -1;
+    }
+
     /* later, read from the beginning of the file stream */
     input_file.seekg(0, std::ios::beg);
+
     /* allocate the necessary vector size */
-    std::vector<uint8_t> file_content(4096);
+    std::vector<uint8_t> file_content(4096, 0);
 
     /* read the file! */ 
     if(!input_file.read(reinterpret_cast<char*>(file_content.data() + entry_point), file_size))
@@ -140,31 +245,12 @@ int main(int argc, char* argv[]) {
     }
 
     /* close input file */
+    input_file.close();
 
     /* insert font data into memory */
-    // file_content.insert(file_content.begin() + 0x50, &font_data[0], &font_data[80]);
+    // file_content.insert(file_content.begin() + font_loaded_at, &font_data[0], &font_data[80]);
 
-
-    std::ifstream file(argv[1], std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Error opening file: " << argv[1] << std::endl;
-    }
-
-    unsigned char byte;
-    int count = 0;
-
-    while (file.read(reinterpret_cast<char*>(&byte), sizeof(byte))) {
-        std::cout << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(byte) << ' ';
-        if (++count % 16 == 0) { // New line every 16 bytes
-            std::cout << std::endl;
-        }
-    }
-
-    if (count % 16 != 0) { // Ensure to end with a new line if the last line is not complete
-        std::cout << std::endl;
-    }
-
-    file.close();
+    std::copy(font_data, font_data + 80, file_content.begin() + font_loaded_at);
 
 
     /* init sdl */
@@ -194,6 +280,9 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+	int* size = nullptr;
+    const Uint8* keyboard_state = SDL_GetKeyboardState(size);
+
     /*
     void* pixels;
     int pitch;
@@ -203,7 +292,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     */
-    SDL_SetRenderDrawColor(sdl_renderer, 255, 0, 0, 255);
+
+    SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
     SDL_RenderClear(sdl_renderer);
     SDL_RenderPresent(sdl_renderer);
 
@@ -215,28 +305,58 @@ int main(int argc, char* argv[]) {
     uint8_t delay_timer = 0;
     uint8_t sound_timer = 0;
 
-    std::stack<uint16_t> program_stack = {};
+    std::stack<uint16_t> program_stack;
 
     SDL_Event e;
 
     /*
      * Instructions are from here: https://en.wikipedia.org/wiki/CHIP-8
      * todo: implement the necessary instructions!
-     * 00E0: clear screen, done
-     * 1NNN: jump to NNN, done
-     * 00EE: return from subroutine, 
-     * 6XNN: set the register VX
-     *
-     *
-     *
+     * 00E0: done
+     * 00EE: done
+     * 1NNN: done
+     * 2NNN: done
+     * 3XNN: done
+     * 4XNN: done
+     * 5XY0: done
+     * 6XNN: done
+     * 7XNN: done
+     * 8XY0: done
+     * 8XY1: done
+     * 8XY2: done
+     * 8XY3: done
+     * 8XY4: done
+     * 8XY5: done
+     * 8XY6: done
+     * 8XY7: done
+     * 8XYE: done
+     * 9XY0: done
+     * ANNN: done
+     * BNNN: done
+     * CXNN: done
+     * DXYN: done
+     * EX9E: done
+     * EXA1: done
+     * FX07: todo
+     * FX0A: todo
+     * FX15: todo
+     * FX18: todo
+     * FX1E: done
+     * FX29: done
+     * FX33: done
+     * FX55: done
+     * FX65: done
      */
+
+    size_t instructions = 0;
+    auto before_execution = std::chrono::high_resolution_clock::now();
 
     while(register_PC + 1 < file_content.size())
     {
         SDL_PollEvent(&e);
         if(e.type == SDL_QUIT)
         {
-            return 0;
+            goto end;
         }
 	    /* fetch instruction */
         uint16_t instruction = (file_content[register_PC] << 8) | file_content[register_PC + 1];
@@ -259,15 +379,29 @@ int main(int argc, char* argv[]) {
 		        {
 		        case 0x00e0:
 			        {
-		        		std::cout << "clearing screen" << std::endl;
 						SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
 		        		SDL_RenderClear(sdl_renderer);
 		        		SDL_RenderPresent(sdl_renderer);
+                        log("00E0");
 		        		break;
+			        }
+		        case 0x00ee:
+			        {
+						register_PC = program_stack.top();
+                        // register_PC -= 2; !!! VERY IMPORTANT !!! WRITEUP: todo
+                        program_stack.pop();
+                        log("00EE");
+						break;
+			        }
+		        case 0x00ff:
+			        {
+						log("00FF");
+                        break;
 			        }
 		        default:
 			        {
-						std::cout << "default case 1\n";
+						log("default case");
+                        std::cout << "INSTR: " << (instruction) << "\n";
 		        		break;
 			        }
 		        }
@@ -275,38 +409,140 @@ int main(int argc, char* argv[]) {
 	        }
         case 0x1000:
 	        {
-        		std::cout << "jump instruction" << std::endl;
-                register_PC = instruction & 0x0FFF;
-                std::cout << "asdasd" << std::endl;
+        		register_PC = instruction & 0x0FFF;
+                register_PC -= 2;
+                log("1NNN");
                 break;
 	        }
         case 0x2000:
 	        {
+				program_stack.push(register_PC);
+                register_PC = instruction & 0x0FFF;
+                register_PC -= 2;
+                log("2NNN");
         		break;
+	        }
+        case 0x3000:
+	        {
+				if(registers[nibble_2] == inst_second)
+				{
+                    register_PC += 2;
+				}
+                log("3XNN");
+        		break;
+	        }
+        case 0x4000:
+	        {
+	            if (registers[nibble_2] != inst_second)
+	            {
+	                register_PC += 2;
+	            }
+                log("4XNN");
+				break;
+	        }
+        case 0x5000:
+	        {
+                if(registers[nibble_2] == registers[nibble_3])
+                {
+                    register_PC += 2;
+                }
+                log("5XY0");
+				break;
 	        }
         case 0x6000:
 	        {
         		registers[nibble_2] = inst_second;
+                log("6XNN");
         		break;
 	        }
         case 0x7000:
 	        {
 				registers[nibble_2] += inst_second;
+				// registers[nibble_2] = (registers[nibble_2] + inst_second) & 0xFF;
+                log("7XNN");
         		break;
+	        }
+        case 0x8000:
+	        {
+                if(nibble_4 == 0x00) 
+                {
+                    registers[nibble_2] = registers[nibble_3];
+                    log("8XY0");
+                }
+                else if(nibble_4 == 0x01) /* working */
+                {
+                    registers[nibble_2] |= registers[nibble_3];
+                    log("8XY1");
+                }else if(nibble_4 == 0x02) /* working */
+                {
+                    registers[nibble_2] &= registers[nibble_3];
+                    log("8XY2");
+                }
+                else if (nibble_4 == 0x03) /* working */
+                {
+                    registers[nibble_2] ^= registers[nibble_3];
+                    log("8XY3");
+                }else if (nibble_4 == 0x04) /* working */
+                {
+                    size_t sum = registers[nibble_2] + registers[nibble_3];
+                    registers[nibble_2] = sum & 0xFF;
+                    registers[VF] = (sum > 255) ? 0x01 : 0x00;
+                    log("8XY4");
+                }else if (nibble_4 == 0x05)
+                {
+                    registers[nibble_2] -= registers[nibble_3];
+                    registers[VF] = (registers[nibble_2] > registers[nibble_3]) ? 0x01 : 0x00;
+                    log("8XY5");
+                }else if (nibble_4 == 0x06) /* working */
+                {
+                    registers[VF] = registers[nibble_2] & 0x01;
+                    registers[nibble_2] >>= 1;
+                    log("8XY6");
+                }else if(nibble_4 == 0x07)
+                {
+                    registers[nibble_2] = registers[nibble_3] - registers[nibble_2];
+                    registers[VF] = (registers[nibble_3] >= registers[nibble_2]) ? 0x01 : 0x00;
+                    log("8XY7");
+                }else if(nibble_4 == 0x0e) /* working */
+                {
+                    registers[VF] = (registers[nibble_2] & 0x80) ? 1 : 0;
+                    registers[nibble_2] <<= 1;
+                    log("8XYE");
+                }
+				break;
+	        }
+        case 0x9000:
+	        {
+		        if(nibble_4 == 0 && (registers[nibble_2] != registers[nibble_3]))
+		        {
+                    register_PC += 2;
+		        }
+                log("9XY0");
+                break;
 	        }
         case 0xA000:
 	        {
 				register_I = (instruction & 0x0FFF);
-                std::cout << "asd" << std::endl;
+                log("ANNN");
         		break;
+	        }
+        case 0xB000:
+	        {
+				register_PC = registers[V0] + (instruction & 0x0FFF);
+                register_PC -= 2;
+                log("BNNN");
+				break;
+	        }
+        case 0xC000:
+	        {
+				registers[nibble_2] = rand() & inst_second;
+                log("CNNN");
+                break;
 	        }
         case 0xD000:
 	        {
         		const uint8_t x_coordinate = registers[nibble_2];
                 const uint8_t y_coordinate = registers[nibble_3];
-
-                std::cout << "X: " << (int)x_coordinate << " Y: " << (int)y_coordinate << "\n";
-
                 const uint8_t height = nibble_4;
 
                 registers[VF] = 0x00;
@@ -323,33 +559,11 @@ int main(int argc, char* argv[]) {
 
                         uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
 
-                        /*
                         if(current_pixel)
                         {
-                            if (display[pixel_x][pixel_y])
-                            {
+                            if (display[pixel_x][pixel_y]) {
                                 registers[VF] = 0x01;
-                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
                             }
-                            SDL_Rect rectangle;
-                            rectangle.x = pixel_x;
-                            rectangle.y = pixel_y;
-                            rectangle.h = 1;
-                            rectangle.w = 1;
-
-                            SDL_SetRenderDrawColor(sdl_renderer, 100, 0, 0, 0);
-                            SDL_RenderFillRect(sdl_renderer, &rectangle);
-                            SDL_RenderPresent(sdl_renderer);
-                            display[pixel_x][pixel_y] ^= 1;
-                        }
-                        */
-
-                        if (current_pixel && display[pixel_x][pixel_y])
-                        {
-                            registers[VF] = 0x01;
-                        }
-                        else if (current_pixel && !(display[pixel_x][pixel_y]))
-                        {
                             SDL_Rect rectangle;
                             rectangle.x = pixel_x * SCALE_FACTOR;
                             rectangle.y = pixel_y * SCALE_FACTOR;
@@ -359,32 +573,102 @@ int main(int argc, char* argv[]) {
                             SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
                             SDL_RenderFillRect(sdl_renderer, &rectangle);
                             SDL_RenderPresent(sdl_renderer);
-                            display[pixel_x][pixel_y] = 1;
-                        }
-                        /*
-                        if (current_pixel)
-                        {
-                            if (display[pixel_x][pixel_y] == 1)
-                            {
-                                registers[VF] = 0x01;
-                            }
                             display[pixel_x][pixel_y] ^= 1;
                         }
-                        */
-
 	                }
                 }
         		break;
 	        }
+        case 0xE000:
+	        {
+		        if(inst_second == 0x9e)
+		        {
+                    SDL_PumpEvents();
+                    if(keyboard_state[get_keycode_for_chipkey(registers[nibble_2])])
+                    {
+                        register_PC += 2;
+                    }
+                    log("EX9E");
+		        }else if(inst_second == 0xa1)
+		        {
+                    SDL_PumpEvents();
+                    if (!keyboard_state[get_keycode_for_chipkey(registers[nibble_2])])
+                    {
+                        register_PC += 2;
+                    }
+                    log("EXA1");
+		        }
+                break;
+	        }
+        case 0xF000:
+	        {
+                if(inst_second == 0x1e)
+                {
+                    register_I += registers[nibble_2];
+                    log("FX1E");
+                }else if(inst_second == 0x29)
+                {
+                    register_I = font_loaded_at + registers[nibble_2] * 5;
+                    log("FX29");
+                }else if(inst_second == 0x33)
+				{
+                    uint8_t reg_val = registers[nibble_2];
+                    file_content[register_I + 0] = reg_val / 100;
+                    file_content[register_I + 1] = (reg_val / 10) % 10;
+                    file_content[register_I + 2] = reg_val % 10;
+                    log("FX33");
+				}else if(inst_second == 0x55)
+				{
+                    for(int i=0; i <= nibble_2; i++)
+                    {
+                        file_content[register_I + i] = registers[i];
+                    }
+                    log("FX55");
+				}else if(inst_second == 0x65)
+				{
+                    for (int i = 0; i <= nibble_2; i++)
+                    {
+                        registers[i] = file_content[register_I + i];
+                    }
+                    log("FX65");
+				}else if(inst_second == 0x07)
+				{
+                    log("FX07");
+                    break;
+				}else if(inst_second == 0x0a)
+				{
+                    log("FX0A");
+                    break;
+				}else if(inst_second == 0x15)
+				{
+                    log("FX15");
+                    break;
+				}else if(inst_second == 0x18)
+				{
+                    log("FX18");
+                    break;
+				}
+				break;
+	        }
         default:
 	        {
-            std::cout << "default case 2\n";
+				log("default case 2");
         		break;
 	        }
         }
-        Sleep(300);
         register_PC += 2;
+        instructions += 1;
     }
+
+    end:
+
+    auto after_execution = std::chrono::high_resolution_clock::now();
+
+    auto final_execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(after_execution - before_execution);
+
+    std::cout << "Time to execute: " << final_execution_time.count() << "\n";
+    std::cout << "Milliseconds : " << instructions / final_execution_time.count() << "\n";
+    std::cout << "Instructions: " << instructions << "\n";
 
     /* try to destroy the created windows, textures etc.! */
     SDL_DestroyTexture(sdl_texture);

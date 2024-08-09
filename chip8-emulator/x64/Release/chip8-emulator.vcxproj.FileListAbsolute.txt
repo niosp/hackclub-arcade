@@ -1,0 +1,3 @@
+C:\Users\User\Desktop\hackclub-arcade\chip8-emulator\x64\Release\chip8-emulator.vcxproj.CopyComplete
+C:\Users\User\Desktop\hackclub-arcade\chip8-emulator\x64\Release\chip8-emulator.exe
+C:\Users\User\Desktop\hackclub-arcade\chip8-emulator\x64\Release\SDL2.dll
