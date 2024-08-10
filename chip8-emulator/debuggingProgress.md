@@ -111,3 +111,13 @@ Fixed some registers but had to rollback the image drawing function, but now spa
  ### Fixed the carry flag issue (partial)
 
  ![Carry flag issues](image-7.png)
+
+ ### Fixed the scrambled pixel display
+
+ ![Scrambled Text](image-8.png)
+
+ Another bug that's obvious if you know the fix, but if you don't you can spend hours and hours debugging the code. Currently, a 2 dimensional array maintains the state of each pixel and everytime a pixel is being modified, that array should be updated:
+
+ ![Pixel state array](image-9.png)
+
+ And this is properly implemented in the drawing function. So pixels are XORed and the sprite is drawn onto the screen. But when clearing the screen, only SDL actions were implemented before fix thus leaving the array with old data alone which leads to weird artifacts. The solution is to make sure when screen is being cleared, set all bits to 0. 

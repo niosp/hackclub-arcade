@@ -17,12 +17,9 @@ uint8_t thread_running = 0;
 uint8_t delay_timer;
 uint8_t sound_timer;
 
-std::thread timer_thread;
-std::mutex timer_mutex;
-
 uint8_t logging_enabled = 1;
 
-const int SCALE_FACTOR = 10;
+const int SCALE_FACTOR = 15;
 const int EMULATOR_WIDTH = 64;
 const int EMULATOR_HEIGHT = 32;
 
@@ -75,33 +72,6 @@ enum register_enum
     VE = 0x0E,
     VF = 0x0F /* flag register */
 };
-
-void timer_loop() {
-    auto last_update_time = std::chrono::steady_clock::now();
-
-    while (true) {
-        std::cout << "thread running\n";
-        std::unique_lock<std::mutex> lock(timer_mutex);
-
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update_time).count();
-
-        if (elapsed >= 16) {
-            if (delay_timer > 0) {
-                --delay_timer;
-            }
-
-            if (sound_timer > 0) {
-                if (--sound_timer == 0) {
-                    std::cout << "sound timer reached 0\n";
-                }
-            }
-
-            last_update_time = now;
-        }
-        lock.unlock();
-    }
-}
 
 void log(const char* logging_text)
 {
@@ -195,7 +165,7 @@ int8_t init_sdl()
 
 SDL_Window* create_window()
 {
-    return SDL_CreateWindow("SDL2 Window",
+    return SDL_CreateWindow("CHIP8 Interpreter",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         EMULATOR_WIDTH * SCALE_FACTOR, EMULATOR_HEIGHT * SCALE_FACTOR,
@@ -295,10 +265,12 @@ int main(int argc, char* argv[]) {
 	int* size = nullptr;
     const Uint8* keyboard_state = SDL_GetKeyboardState(size);
 
+    /* set the window color to black */
     SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
     SDL_RenderClear(sdl_renderer);
     SDL_RenderPresent(sdl_renderer);
 
+    /* init registers */
     std::array<uint8_t, 16> registers = {0};
 
     uint16_t register_PC = entry_point;
@@ -339,10 +311,10 @@ int main(int argc, char* argv[]) {
      * DXYN: done
      * EX9E: done
      * EXA1: done
-     * FX07: todo
-     * FX0A: todo
-     * FX15: todo
-     * FX18: todo
+     * FX07: done
+     * FX0A: done
+     * FX15: done
+     * FX18: done
      * FX1E: done
      * FX29: done
      * FX33: done
@@ -353,8 +325,12 @@ int main(int argc, char* argv[]) {
     size_t instructions = 0;
     auto before_execution = std::chrono::high_resolution_clock::now();
 
+    size_t set_delay = 3500;
+
+    /* main loop */
     while(register_PC + 1 < file_content.size())
     {
+        /* poll events (needed to quit, get keystrokes) */
         SDL_PollEvent(&e);
         SDL_PumpEvents();
         if(e.type == SDL_QUIT)
@@ -374,6 +350,17 @@ int main(int argc, char* argv[]) {
 
         bool increase_pc = true;
 
+        if (keyboard_state[SDL_SCANCODE_6])
+        {
+            std::cout << "decreased\n\n";
+            set_delay -= 10;
+        }
+        if (keyboard_state[SDL_SCANCODE_7])
+        {
+            std::cout << "increased\n\n";
+            set_delay += 10;
+        }
+
         /* switch over the first nibble */
         switch(instruction & 0xF000)
         {
@@ -382,8 +369,10 @@ int main(int argc, char* argv[]) {
                 /* switch over third + fourth nibble */
 		        switch(instruction & 0x00FF)
 		        {
+		        	/* clear content */
 		        case 0x00e0:
 			        {
+                        /* set all bits in the array to 0 */
                         for(int i=0; i < EMULATOR_WIDTH; i++)
                         {
 	                        for(int j=0; j < EMULATOR_HEIGHT; j++)
@@ -391,19 +380,21 @@ int main(int argc, char* argv[]) {
                                 display[i][j] = false;
 	                        }
                         }
+                        /* render window with color black */
 						SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
                         SDL_RenderClear(sdl_renderer);
                         log("00E0");
 		        		break;
 			        }
+                    /* return from a subroutine */
 		        case 0x00ee:
 			        {
 						register_PC = program_stack.top();
-                        // register_PC -= 2; !!! VERY IMPORTANT !!! WRITEUP: todo
                         program_stack.pop();
                         log("00EE");
 						break;
 			        }
+                    /* no operation */
 		        case 0x00ff:
 			        {
 						log("00FF");
@@ -418,6 +409,7 @@ int main(int argc, char* argv[]) {
 		        }
                 break;
 	        }
+            /* jump to address NNN */
         case 0x1000:
 	        {
         		register_PC = instruction & 0x0FFF;
@@ -425,6 +417,7 @@ int main(int argc, char* argv[]) {
                 log("1NNN");
                 break;
 	        }
+            /* call subroutine at NNN, push old program counter to stack */
         case 0x2000:
 	        {
 				program_stack.push(register_PC);
@@ -433,6 +426,7 @@ int main(int argc, char* argv[]) {
                 log("2NNN");
         		break;
 	        }
+            /* skip next instruction if reg[nb2] == inst_second */
         case 0x3000:
 	        {
 				if(registers[nibble_2] == inst_second)
@@ -442,6 +436,7 @@ int main(int argc, char* argv[]) {
                 log("3XNN");
         		break;
 	        }
+            /* skip next instruction if reg[nb2] != inst_second */
         case 0x4000:
 	        {
 	            if (registers[nibble_2] != inst_second)
@@ -451,6 +446,7 @@ int main(int argc, char* argv[]) {
                 log("4XNN");
 				break;
 	        }
+            /* skip next instruction if reg[nb2] == reg[nb3] */
         case 0x5000:
 	        {
                 if(registers[nibble_2] == registers[nibble_3])
@@ -460,12 +456,14 @@ int main(int argc, char* argv[]) {
                 log("5XY0");
 				break;
 	        }
+            /* set reg[nb2] == inst_second */
         case 0x6000:
 	        {
         		registers[nibble_2] = inst_second;
                 log("6XNN");
         		break;
 	        }
+            /* add NN to reg[nb2] */
         case 0x7000:
 	        {
 				registers[nibble_2] += inst_second;
@@ -473,6 +471,7 @@ int main(int argc, char* argv[]) {
                 log("7XNN");
         		break;
 	        }
+            /* 0x8s instructions (math & bit operations) */
         case 0x8000:
 	        {
                 if(nibble_4 == 0x00) 
@@ -532,6 +531,7 @@ int main(int argc, char* argv[]) {
                 }
 				break;
 	        }
+            /* skips instruction if reg[nb2] != reg[nb3] */
         case 0x9000:
 	        {
 		        if(nibble_4 == 0 && (registers[nibble_2] != registers[nibble_3]))
@@ -541,12 +541,14 @@ int main(int argc, char* argv[]) {
                 log("9XY0");
                 break;
 	        }
+            /* set mem ptr to address NNN */
         case 0xA000:
 	        {
 				register_I = (instruction & 0x0FFF);
                 log("ANNN");
         		break;
 	        }
+            /* jump to addr NNN plus addr in reg[V0] */
         case 0xB000:
 	        {
 				register_PC = registers[V0] + (instruction & 0x0FFF);
@@ -554,12 +556,14 @@ int main(int argc, char* argv[]) {
                 log("BNNN");
 				break;
 	        }
+            /* random & NN */
         case 0xC000:
 	        {
 				registers[nibble_2] = rand() & inst_second;
                 log("CNNN");
                 break;
 	        }
+            /* draw a sprite */
         case 0xD000:
 	        {
 	            const uint8_t x_coordinate = registers[nibble_2];
@@ -587,14 +591,14 @@ int main(int argc, char* argv[]) {
                         {
                             if (display[pixel_x][pixel_y])
                             {
-                                registers[VF] = 0x01; // Collision detected
-                                display[pixel_x][pixel_y] = false; // Clear the pixel
+                                registers[VF] = 0x01;
+                                display[pixel_x][pixel_y] = false;
                                 SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
 
                             }
                             else
                             {
-                                display[pixel_x][pixel_y] = true; // Set the pixel
+                                display[pixel_x][pixel_y] = true;
                                 SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 255);
                             }
 
@@ -608,8 +612,10 @@ int main(int argc, char* argv[]) {
                         }
 	                }
 	            }
+                SDL_RenderPresent(sdl_renderer);
 	            break;
 	        }
+            /* key detection instructions */
         case 0xE000:
 	        {
 		        if(inst_second == 0x9e)
@@ -629,13 +635,15 @@ int main(int argc, char* argv[]) {
 		        }
                 break;
 	        }
+            /* timers, memory, bcd */
         case 0xF000:
 	        {
                 if(inst_second == 0x1e)
                 {
                     register_I += registers[nibble_2];
                     log("FX1E");
-                }else if(inst_second == 0x29)
+                }
+        		else if(inst_second == 0x29)
                 {
                     register_I = font_loaded_at + registers[nibble_2] * 5;
                     log("FX29");
@@ -708,8 +716,7 @@ int main(int argc, char* argv[]) {
         instructions += 1;
         if(delay_timer > 0) delay_timer -= 1;
         if (sound_timer > 0) sound_timer -= 1;
-        SDL_RenderPresent(sdl_renderer);
-        // Sleep(1);
+        std::this_thread::sleep_for(std::chrono::microseconds(set_delay));
     }
 
     end:
