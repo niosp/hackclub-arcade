@@ -1,10 +1,7 @@
 #include <array>
 #include <chrono>
 #include <iostream>
-#include <SDL2/SDL.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <windows.h>
+#include <cstdio>
 #include <stack>
 #include <vector>
 #include <fstream>
@@ -12,14 +9,15 @@
 #include <mutex>
 #include <sstream>
 
-uint8_t thread_running = 0;
+#include <SDL2/SDL.h>
 
-uint8_t delay_timer;
-uint8_t sound_timer;
+uint8_t delay_timer = 0;
+uint8_t sound_timer = 0;
+uint8_t sound_on = 0;
 
 uint8_t logging_enabled = 1;
 
-const int SCALE_FACTOR = 15;
+const int SCALE_FACTOR = 10;
 const int EMULATOR_WIDTH = 64;
 const int EMULATOR_HEIGHT = 32;
 
@@ -27,10 +25,23 @@ const int default_color_r = 0;
 const int default_color_g = 5;
 const int default_color_b = 82;
 
+const int default_bg_color_r = 0;
+const int default_bg_color_g = 0;
+const int default_bg_color_b = 0;
+
 const int entry_point = 0x200;
 const int font_loaded_at = 0x050;
 
-bool display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = { 0 };
+const uint16_t delay_steps = 20;
+
+const int sound_frequency = 44100;
+const int sound_amplitude = 500;
+const int sound_sample_rate = 44100;
+const int sound_samples = 2048;
+
+SDL_AudioDeviceID audio_device;
+
+uint8_t display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = { 0 };
 
 uint8_t keys[322] = {0};
 
@@ -145,6 +156,41 @@ void print_current_state_to_console() {
         std::cout << "\n";
     }
 	std::cout << "\n\n";
+}
+
+void audio_callback(void* userdata, Uint8* stream, int len) {
+    Sint16* buf = (Sint16*)stream;
+    const int length = len / 2;
+
+    for (int i = 0; i < length; i++) {
+        if (sound_on) {
+            buf[i] = sound_amplitude * (i % (sound_sample_rate / 440) < (sound_sample_rate / 880) ? 1 : -1);
+        }
+        else {
+            buf[i] = 0;
+        }
+    }
+}
+
+void init_audio() {
+    SDL_AudioSpec want;
+    SDL_AudioSpec have;
+
+    SDL_memset(&want, 0, sizeof(want));
+    want.freq = sound_frequency;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;
+    want.samples = sound_samples;
+    want.callback = audio_callback;
+
+    audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+
+    if (audio_device == 0) {
+        std::cerr << "Failed to open audio device: " << SDL_GetError() << "\n";
+        std::exit(1);
+    }
+
+    SDL_PauseAudioDevice(audio_device, 0);
 }
 
 uint16_t read_2_bytes(std::vector<uint8_t>& memory, uint32_t index) {
@@ -262,6 +308,15 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    /* init sdl audio subsystem */
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+        std::cerr << "Failed to initialize SDL audio: " << SDL_GetError() << "\n";
+        return 1;
+    }
+
+    /* init sdl audio */
+    init_audio();
+
 	int* size = nullptr;
     const Uint8* keyboard_state = SDL_GetKeyboardState(size);
 
@@ -348,17 +403,17 @@ int main(int argc, char* argv[]) {
         uint8_t nibble_3 = inst_second >> 4;
         uint8_t nibble_4 = inst_second & 15;
 
-        bool increase_pc = true;
+        uint8_t increase_pc = 1;
 
-        if (keyboard_state[SDL_SCANCODE_6])
+         if (keyboard_state[SDL_SCANCODE_6])
         {
-            std::cout << "decreased\n\n";
-            set_delay -= 10;
+         	log("");
+            set_delay -= delay_steps;
         }
         if (keyboard_state[SDL_SCANCODE_7])
         {
             std::cout << "increased\n\n";
-            set_delay += 10;
+            set_delay += delay_steps;
         }
 
         /* switch over the first nibble */
@@ -377,7 +432,7 @@ int main(int argc, char* argv[]) {
                         {
 	                        for(int j=0; j < EMULATOR_HEIGHT; j++)
 	                        {
-                                display[i][j] = false;
+                                display[i][j] = 0;
 	                        }
                         }
                         /* render window with color black */
@@ -413,7 +468,7 @@ int main(int argc, char* argv[]) {
         case 0x1000:
 	        {
         		register_PC = instruction & 0x0FFF;
-                increase_pc = false;
+                increase_pc = 0;
                 log("1NNN");
                 break;
 	        }
@@ -422,7 +477,7 @@ int main(int argc, char* argv[]) {
 	        {
 				program_stack.push(register_PC);
                 register_PC = instruction & 0x0FFF;
-                increase_pc = false;
+                increase_pc = 0;
                 log("2NNN");
         		break;
 	        }
@@ -552,7 +607,7 @@ int main(int argc, char* argv[]) {
         case 0xB000:
 	        {
 				register_PC = registers[V0] + (instruction & 0x0FFF);
-                increase_pc = false;
+                increase_pc = 0;
                 log("BNNN");
 				break;
 	        }
@@ -592,13 +647,13 @@ int main(int argc, char* argv[]) {
                             if (display[pixel_x][pixel_y])
                             {
                                 registers[VF] = 0x01;
-                                display[pixel_x][pixel_y] = false;
-                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
+                                display[pixel_x][pixel_y] = 0;
+                                SDL_SetRenderDrawColor(sdl_renderer, default_bg_color_r, default_bg_color_g, default_bg_color_b, 255);
 
                             }
                             else
                             {
-                                display[pixel_x][pixel_y] = true;
+                                display[pixel_x][pixel_y] = 1;
                                 SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 255);
                             }
 
@@ -683,13 +738,8 @@ int main(int argc, char* argv[]) {
                             registers[nibble_2] = chip_keycode;
                         }else
                         {
-                            std::cout << "different key pressed\n";
-                            increase_pc = false;
+                            increase_pc = 0;
                         }
-                    }else
-                    {
-                        increase_pc = false;
-                        std::cout << "no valid keypress detected\n";
                     }
                     log("FX0A");
                     break;
@@ -712,22 +762,41 @@ int main(int argc, char* argv[]) {
         		break;
 	        }
         }
+
+        /* increase program counter (default) */
         if(increase_pc) register_PC += 2;
+
+        /* just for debugging */ 
         instructions += 1;
+
+        /* decrease the timer */
         if(delay_timer > 0) delay_timer -= 1;
-        if (sound_timer > 0) sound_timer -= 1;
+
+        /* handle sound */
+        if (sound_timer > 0)
+        {
+            sound_on = 1;
+            sound_timer -= 1;
+        }else if(!sound_timer)
+        {
+            sound_on = 0;
+        }
+
         std::this_thread::sleep_for(std::chrono::microseconds(set_delay));
     }
 
+    /* label used when trying to quit the application (SDL_QUIT event) */
     end:
 
+    /* timing calculations */
     auto after_execution = std::chrono::high_resolution_clock::now();
-
     auto final_execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(after_execution - before_execution);
 
     std::cout << "Time to execute: " << final_execution_time.count() << "\n";
-    std::cout << "Milliseconds : " << instructions / final_execution_time.count() << "\n";
     std::cout << "Instructions: " << instructions << "\n";
+
+    /* de-init sound device */
+    SDL_CloseAudioDevice(audio_device);
 
     /* try to destroy the created windows, textures etc.! */
     SDL_DestroyTexture(sdl_texture);
