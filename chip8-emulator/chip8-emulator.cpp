@@ -33,7 +33,7 @@ const int default_color_b = 82;
 const int entry_point = 0x200;
 const int font_loaded_at = 0x050;
 
-uint8_t display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = {};
+bool display[EMULATOR_WIDTH][EMULATOR_HEIGHT] = { 0 };
 
 uint8_t keys[322] = {0};
 
@@ -112,41 +112,53 @@ uint16_t get_keycode_for_chipkey(uint8_t chipkey)
 {
 	switch(chipkey)
 	{
-	case 0x00:
-        return SDL_SCANCODE_1;
-	case 0x01:
-        return SDL_SCANCODE_2;
-	case 0x02:
-        return SDL_SCANCODE_3;
-	case 0x03:
-        return SDL_SCANCODE_4;
-	case 0x04:
-        return SDL_SCANCODE_Q;
-	case 0x05:
-        return SDL_SCANCODE_W;
-	case 0x06:
-        return SDL_SCANCODE_E;
-	case 0x07:
-        return SDL_SCANCODE_R;
-	case 0x08:
-        return SDL_SCANCODE_A;
-	case 0x09:
-        return SDL_SCANCODE_S;
-	case 0xa:
-        return SDL_SCANCODE_D;
-	case 0xb:
-        return SDL_SCANCODE_F;
-	case 0xc:
-        return SDL_SCANCODE_Z;
-	case 0xd:
-        return SDL_SCANCODE_X;
-	case 0xe:
-        return SDL_SCANCODE_C;
-	case 0xf:
-        return SDL_SCANCODE_V;
+        /* row 1 */
+	case 0x01:return SDL_SCANCODE_1;
+	case 0x02:return SDL_SCANCODE_2;
+	case 0x03:return SDL_SCANCODE_3;
+	case 0x0c:return SDL_SCANCODE_4;
+		/* row 2 */
+	case 0x04:return SDL_SCANCODE_Q;
+	case 0x05:return SDL_SCANCODE_W;
+	case 0x06:return SDL_SCANCODE_E;
+	case 0x0d:return SDL_SCANCODE_R;
+        /* row 3 */
+	case 0x07:return SDL_SCANCODE_A;
+	case 0x08:return SDL_SCANCODE_S;
+	case 0x09:return SDL_SCANCODE_D;
+	case 0x0e:return SDL_SCANCODE_F;
+        /* row 4 */
+	case 0x0a:return SDL_SCANCODE_Z;
+	case 0x00:return SDL_SCANCODE_X;
+	case 0x0b:return SDL_SCANCODE_C;
+	case 0x0f:return SDL_SCANCODE_V;
 	default:
         log("requested key that does not exist");
-        return 0;
+		return 0;
+	}
+}
+
+uint8_t get_chipkey_for_keycode(uint16_t keycode)
+{
+	switch(keycode)
+	{
+	case SDL_SCANCODE_1:return 0x01;
+	case SDL_SCANCODE_2:return 0x02;
+	case SDL_SCANCODE_3:return 0x03;
+	case SDL_SCANCODE_4:return 0x0c;
+	case SDL_SCANCODE_Q:return 0x04;
+	case SDL_SCANCODE_W:return 0x05;
+	case SDL_SCANCODE_E:return 0x06;
+	case SDL_SCANCODE_R:return 0x0d;
+	case SDL_SCANCODE_A:return 0x07;
+	case SDL_SCANCODE_S:return 0x08;
+	case SDL_SCANCODE_D:return 0x09;
+	case SDL_SCANCODE_F:return 0x0e;
+	case SDL_SCANCODE_Z:return 0x0a;
+	case SDL_SCANCODE_X:return 0x00;
+	case SDL_SCANCODE_C:return 0x0b;
+	case SDL_SCANCODE_V:return 0x0f;
+	default:return 20; /* return 20 if pressed key is not covered by emulator */
 	}
 }
 
@@ -372,7 +384,15 @@ int main(int argc, char* argv[]) {
 		        {
 		        case 0x00e0:
 			        {
-						SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 0);
+                        for(int i=0; i < EMULATOR_WIDTH; i++)
+                        {
+	                        for(int j=0; j < EMULATOR_HEIGHT; j++)
+	                        {
+                                display[i][j] = false;
+	                        }
+                        }
+						SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
+                        SDL_RenderClear(sdl_renderer);
                         log("00E0");
 		        		break;
 			        }
@@ -555,37 +575,38 @@ int main(int argc, char* argv[]) {
 	                /* draw 8 pixels for each row */
 	                for (uint8_t col = 0; col < 8; col++)
 	                {
+                        if (x_coordinate + col >= EMULATOR_WIDTH || y_coordinate + row >= EMULATOR_HEIGHT)
+                            continue;
+
                         uint8_t pixel_x = (x_coordinate + col) % EMULATOR_WIDTH;
                         uint8_t pixel_y = (y_coordinate + row) % EMULATOR_HEIGHT;
 
-                        uint8_t current_pixel = (sprite_data & (1 << (7 - col))) >> (7 - col);
+                        uint8_t current_pixel = (sprite_data & (0x80 >> col)) >> (7 - col);
 
-                        if (current_pixel != 0) {
-                            if (display[pixel_x][pixel_y] == 1)
-                                registers[VF] = 0x01;
-                            display[pixel_x][pixel_y] ^= 1;
-                        }
-
-                        /* prepare rendering */
-
-                        SDL_Rect rectangle;
-                        rectangle.x = pixel_x * SCALE_FACTOR;
-                        rectangle.y = pixel_y * SCALE_FACTOR;
-                        rectangle.w = SCALE_FACTOR;
-                        rectangle.h = SCALE_FACTOR;
-
-                        if(display[pixel_x][pixel_y])
+                        if (current_pixel)
                         {
-                            SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 0);
-                        }else
-                        {
-                            SDL_SetRenderDrawColor(sdl_renderer, 10, 0, 0, 255);
-                        }
+                            if (display[pixel_x][pixel_y])
+                            {
+                                registers[VF] = 0x01; // Collision detected
+                                display[pixel_x][pixel_y] = false; // Clear the pixel
+                                SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
 
-                        SDL_RenderFillRect(sdl_renderer, &rectangle);
+                            }
+                            else
+                            {
+                                display[pixel_x][pixel_y] = true; // Set the pixel
+                                SDL_SetRenderDrawColor(sdl_renderer, default_color_r, default_color_g, default_color_b, 255);
+                            }
+
+                            SDL_Rect rectangle;
+                            rectangle.x = pixel_x * SCALE_FACTOR;
+                            rectangle.y = pixel_y * SCALE_FACTOR;
+                            rectangle.w = SCALE_FACTOR;
+                            rectangle.h = SCALE_FACTOR;
+
+                            SDL_RenderFillRect(sdl_renderer, &rectangle);
+                        }
 	                }
-                    print_current_state_to_console();
-                    Sleep(20);
 	            }
 	            break;
 	        }
@@ -646,6 +667,22 @@ int main(int argc, char* argv[]) {
                     break;
 				}else if(inst_second == 0x0a)
 				{
+                    if(e.type == SDL_KEYDOWN)
+                    {
+                        uint8_t chip_keycode = get_chipkey_for_keycode(e.key.keysym.scancode);
+                        if(chip_keycode != 20)
+                        {
+                            registers[nibble_2] = chip_keycode;
+                        }else
+                        {
+                            std::cout << "different key pressed\n";
+                            increase_pc = false;
+                        }
+                    }else
+                    {
+                        increase_pc = false;
+                        std::cout << "no valid keypress detected\n";
+                    }
                     log("FX0A");
                     break;
 				}else if(inst_second == 0x15)
@@ -672,7 +709,7 @@ int main(int argc, char* argv[]) {
         if(delay_timer > 0) delay_timer -= 1;
         if (sound_timer > 0) sound_timer -= 1;
         SDL_RenderPresent(sdl_renderer);
-        Sleep(1);
+        // Sleep(1);
     }
 
     end:
