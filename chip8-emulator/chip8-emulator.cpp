@@ -211,7 +211,7 @@ int8_t init_sdl()
 
 SDL_Window* create_window()
 {
-    return SDL_CreateWindow("CHIP8 Interpreter",
+    return SDL_CreateWindow("CHIP-8",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         EMULATOR_WIDTH * SCALE_FACTOR, EMULATOR_HEIGHT * SCALE_FACTOR,
@@ -276,10 +276,7 @@ int main(int argc, char* argv[]) {
     input_file.close();
 
     /* insert font data into memory */
-    // file_content.insert(file_content.begin() + font_loaded_at, &font_data[0], &font_data[80]);
-
     std::copy(font_data, font_data + 80, file_content.begin() + font_loaded_at);
-
 
     /* init sdl */
     init_sdl();
@@ -338,45 +335,6 @@ int main(int argc, char* argv[]) {
 
     SDL_Event e;
 
-    /*
-     * Instructions are from here: https://en.wikipedia.org/wiki/CHIP-8
-     * todo: implement the necessary instructions!
-     * 00E0: done
-     * 00EE: done
-     * 1NNN: done
-     * 2NNN: done
-     * 3XNN: done
-     * 4XNN: done
-     * 5XY0: done
-     * 6XNN: done
-     * 7XNN: done
-     * 8XY0: done
-     * 8XY1: done
-     * 8XY2: done
-     * 8XY3: done
-     * 8XY4: done
-     * 8XY5: done
-     * 8XY6: done
-     * 8XY7: done
-     * 8XYE: done
-     * 9XY0: done
-     * ANNN: done
-     * BNNN: done
-     * CXNN: done
-     * DXYN: done
-     * EX9E: done
-     * EXA1: done
-     * FX07: done
-     * FX0A: done
-     * FX15: done
-     * FX18: done
-     * FX1E: done
-     * FX29: done
-     * FX33: done
-     * FX55: done
-     * FX65: done
-     */
-
     size_t instructions = 0;
     auto before_execution = std::chrono::high_resolution_clock::now();
 
@@ -392,6 +350,7 @@ int main(int argc, char* argv[]) {
         {
             goto end;
         }
+
 	    /* fetch instruction */
         uint16_t instruction = (file_content[register_PC] << 8) | file_content[register_PC + 1];
         uint8_t inst_first = file_content[register_PC];
@@ -405,11 +364,12 @@ int main(int argc, char* argv[]) {
 
         uint8_t increase_pc = 1;
 
-         if (keyboard_state[SDL_SCANCODE_6])
+    	if (keyboard_state[SDL_SCANCODE_6])
         {
          	log("");
             set_delay -= delay_steps;
         }
+
         if (keyboard_state[SDL_SCANCODE_7])
         {
             std::cout << "increased\n\n";
