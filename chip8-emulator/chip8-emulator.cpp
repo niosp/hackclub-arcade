@@ -395,7 +395,8 @@ int main(int argc, char* argv[]) {
                                 display[i][j] = 0;
 	                        }
                         }
-                        /* render window with color black */
+
+		        		/* render window with color black */
 						SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
                         SDL_RenderClear(sdl_renderer);
                         log("00E0");

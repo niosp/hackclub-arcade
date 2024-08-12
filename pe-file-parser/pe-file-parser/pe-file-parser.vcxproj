@@ -133,6 +133,7 @@
     <ClCompile Include="ResourceDirectoryEntry.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="pe32parser.hpp" />
     <ClInclude Include="ResourceData.hpp" />
     <ClInclude Include="ResourceDirectory.hpp" />
     <ClInclude Include="ResourceDirectoryEntry.hpp" />

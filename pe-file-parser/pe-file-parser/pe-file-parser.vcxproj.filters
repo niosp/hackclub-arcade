@@ -38,5 +38,8 @@
     <ClInclude Include="ResourceData.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="pe32parser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
