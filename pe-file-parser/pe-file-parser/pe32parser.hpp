@@ -1,10 +1,23 @@
 #pragma once
 
+#include <Windows.h>
 #include <memory>
 #include <stdexcept>
 #include <vector>
 #include <winnt.h>
 #include <iostream>
+#include <string>
+#include <sstream>
+
+class PEDLLType 
+{
+public:
+    PEDLLType(std::string p_name, std::vector<std::string> p_dll_names, IMAGE_IMPORT_DESCRIPTOR p_descr) : name(p_name), dll_names(p_dll_names), descr(p_descr) {};
+private:
+    std::string name;
+    std::vector<std::string> dll_names;
+    IMAGE_IMPORT_DESCRIPTOR descr;
+};
 
 class PEParser
 {
@@ -88,6 +101,9 @@ public:
         DWORD fin_addr = rva_to_offset(virtual_addr_import, section_headers, n_sections);
 
         int import_directory_count = 0;
+
+        /* std::vector with DLL entries */
+        imports = std::make_shared<std::vector<PEDLLType>>();
         
         /* while no empty descriptor was found */
         while (true) {
@@ -123,9 +139,6 @@ public:
 
             std::memcpy(&fin_name, this->data_to_parse->data() + name_offset, (name_size * sizeof(char)) + 1);
 
-            printf("%s:\n", fin_name);
-            delete[] fin_name;
-
             /* -> name parsing & stuff finished */
 
             /* lookup the ILT */
@@ -140,9 +153,75 @@ public:
                 std::cout << "BOUND: TRUE\n";
             }
 
+            /* file offset to thunk data */
+            DWORD arr_thunk_data = rva_to_offset(tmp.OriginalFirstThunk, section_headers, n_sections);
 
+            std::vector<std::string> function_names;
+
+            IMAGE_THUNK_DATA32* thunk_data = (IMAGE_THUNK_DATA32*)(this->data_to_parse->data() + arr_thunk_data);
+
+            while (thunk_data->u1.AddressOfData) {
+                if (thunk_data->u1.AddressOfData & IMAGE_ORDINAL_FLAG32) 
+                {
+                    /* import by ordinal (without function name) */
+                    DWORD ordinal = thunk_data->u1.Ordinal & 0xFFFF;
+                    function_names.push_back("Ordinal_" + std::to_string(ordinal));
+                }
+                else 
+                {
+                    /* normal import by name */
+                    IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(this->data_to_parse->data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, number_of_sections));
+                    function_names.emplace_back(import_by_name->Name);
+                }
+                thunk_data++;
+            }
+
+            std::string dll_name(fin_name);
+
+            PEDLLType dll_temp(dll_name, function_names, tmp);
+
+            imports->emplace_back(dll_temp);
+
+            for (size_t i = 0; i < function_names.size(); ++i) {
+                std::cout << function_names[i] << " ";
+            }
+            std::cout << std::endl;
+
+            delete[] fin_name;
 
             import_directory_count++;
+        }
+
+        /* get BASERELOC directory entry */
+        IMAGE_DATA_DIRECTORY directory_entry_basereloc_rva = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+        /* calculate file offset of the base relocation directory */
+        DWORD base_relocation_directory_addr = rva_to_offset(directory_entry_basereloc_rva.VirtualAddress, section_headers, n_sections);
+
+        DWORD basereloc_size_counter = 0;
+        DWORD basereloc_directory_counter = 0;
+
+        this->base_relocs = std::make_shared<std::vector<IMAGE_BASE_RELOCATION>>();
+
+        while (true)
+        {
+            IMAGE_BASE_RELOCATION temp_base_relo;
+
+            /* base reloc offset: final size of reloc blocks + addr of basereloc directory */
+            DWORD base_relocation_offset = (basereloc_size_counter + base_relocation_directory_addr);
+
+            std::memcpy(&temp_base_relo, this->data_to_parse->data() + base_relocation_offset, sizeof(IMAGE_BASE_RELOCATION));
+
+            /* last basereloc empty, end reached -> terminate */
+            if (temp_base_relo.SizeOfBlock == 0 && temp_base_relo.VirtualAddress == 0)
+            {
+                break;
+            }
+
+            this->base_relocs->emplace_back(temp_base_relo);
+
+            basereloc_directory_counter++;
+            basereloc_size_counter += temp_base_relo.SizeOfBlock;
         }
 
 	}
@@ -176,6 +255,8 @@ public:
 private:
     std::shared_ptr<std::vector<char>> data_to_parse;
     std::shared_ptr<std::vector<IMAGE_SECTION_HEADER>> section_headers;
+    std::shared_ptr<std::vector<PEDLLType>> imports;
+    std::shared_ptr<std::vector<IMAGE_BASE_RELOCATION>> base_relocs;
     PIMAGE_DOS_HEADER m_dos_header;
     PIMAGE_NT_HEADERS32 m_nt_header;
     PIMAGE_OPTIONAL_HEADER32 m_opt_nt_header;
