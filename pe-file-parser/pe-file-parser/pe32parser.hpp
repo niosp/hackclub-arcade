@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Windows.h>
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -9,7 +11,7 @@
 #include <string>
 #include <sstream>
 
-class PEDLLType 
+class PEDLLType
 {
 public:
     PEDLLType(std::string p_name, std::vector<std::string> p_dll_names, IMAGE_IMPORT_DESCRIPTOR p_descr) : name(p_name), dll_names(p_dll_names), descr(p_descr) {};
@@ -22,8 +24,8 @@ private:
 class PEParser
 {
 public:
-	PEParser(std::unique_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr)
-	{
+    PEParser(std::shared_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr)
+    {
         /* check passed data (vector) */
         if (this->data_to_parse->empty()) {
             throw std::invalid_argument("File data is empty.");
@@ -51,7 +53,7 @@ public:
         }
 
         /* file size check */
-		if (this->data_to_parse->size() < nt_header_offset + sizeof(IMAGE_NT_HEADERS)) {
+        if (this->data_to_parse->size() < nt_header_offset + sizeof(IMAGE_NT_HEADERS)) {
             throw std::runtime_error("File is too small to contain a valid NT header.");
         }
 
@@ -64,14 +66,14 @@ public:
         }
 
         /* calculate offset of section headers (DOS + size of NT headers) */
-		const uint32_t section_header_offset = this->m_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32);
+        const uint32_t section_header_offset = this->m_dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS32);
 
         /* calculated offset invalid? */
         if (section_header_offset >= this->data_to_parse->size()) {
             throw std::runtime_error("Invalid section header offset.");
         }
 
-        /* retrieve number of sections present in loaded file */ 
+        /* retrieve number of sections present in loaded file */
         const uint32_t n_sections = this->m_nt_header->FileHeader.NumberOfSections;
 
         /* verify filesize */
@@ -86,7 +88,7 @@ public:
         section_headers = std::make_shared<std::vector<IMAGE_SECTION_HEADER>>(n_sections);
 
         /* copy section header information from pointer above (size = n_sections * sizeof(IMAGE_SECTION_HEADER)) */
-		std::memcpy(this->section_headers->data(), section_headers_t, n_sections * sizeof(IMAGE_SECTION_HEADER));
+        std::memcpy(this->section_headers->data(), section_headers_t, n_sections * sizeof(IMAGE_SECTION_HEADER));
 
         /* get import directory */
         IMAGE_DATA_DIRECTORY import_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -104,7 +106,7 @@ public:
 
         /* std::vector with DLL entries */
         imports = std::make_shared<std::vector<PEDLLType>>();
-        
+
         /* while no empty descriptor was found */
         while (true) {
             IMAGE_IMPORT_DESCRIPTOR tmp;
@@ -121,14 +123,14 @@ public:
             }
 
             /* process DLL, get the name */
-            DWORD name_offset = rva_to_offset(virtual_addr_import, section_headers, n_sections);
+            DWORD name_addr = rva_to_offset(tmp.Name, section_headers, n_sections);
 
             int name_size = 0;
 
             /* calculate size of the name */
             while (true) {
                 char tmp_char;
-                std::memcpy(&tmp_char, this->data_to_parse->data() + (name_offset + name_size), sizeof(char));
+                std::memcpy(&tmp_char, this->data_to_parse->data() + (name_addr + name_size), sizeof(char));
                 if (tmp_char == 0x00) {
                     break;
                 }
@@ -137,7 +139,7 @@ public:
 
             char* fin_name = new char[name_size + 2];
 
-            std::memcpy(&fin_name, this->data_to_parse->data() + name_offset, (name_size * sizeof(char)) + 1);
+            std::memcpy(fin_name, this->data_to_parse->data() + name_addr, (name_size * sizeof(char)) + 1);
 
             /* -> name parsing & stuff finished */
 
@@ -161,16 +163,14 @@ public:
             IMAGE_THUNK_DATA32* thunk_data = (IMAGE_THUNK_DATA32*)(this->data_to_parse->data() + arr_thunk_data);
 
             while (thunk_data->u1.AddressOfData) {
-                if (thunk_data->u1.AddressOfData & IMAGE_ORDINAL_FLAG32) 
-                {
+                if (thunk_data->u1.AddressOfData & IMAGE_ORDINAL_FLAG32) {
                     /* import by ordinal (without function name) */
                     DWORD ordinal = thunk_data->u1.Ordinal & 0xFFFF;
                     function_names.push_back("Ordinal_" + std::to_string(ordinal));
                 }
-                else 
-                {
+                else {
                     /* normal import by name */
-                    IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(this->data_to_parse->data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, number_of_sections));
+                    IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(this->data_to_parse->data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, n_sections));
                     function_names.emplace_back(import_by_name->Name);
                 }
                 thunk_data++;
@@ -191,40 +191,9 @@ public:
 
             import_directory_count++;
         }
+        std::cout << "parsing finished" << std::endl;
 
-        /* get BASERELOC directory entry */
-        IMAGE_DATA_DIRECTORY directory_entry_basereloc_rva = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-
-        /* calculate file offset of the base relocation directory */
-        DWORD base_relocation_directory_addr = rva_to_offset(directory_entry_basereloc_rva.VirtualAddress, section_headers, n_sections);
-
-        DWORD basereloc_size_counter = 0;
-        DWORD basereloc_directory_counter = 0;
-
-        this->base_relocs = std::make_shared<std::vector<IMAGE_BASE_RELOCATION>>();
-
-        while (true)
-        {
-            IMAGE_BASE_RELOCATION temp_base_relo;
-
-            /* base reloc offset: final size of reloc blocks + addr of basereloc directory */
-            DWORD base_relocation_offset = (basereloc_size_counter + base_relocation_directory_addr);
-
-            std::memcpy(&temp_base_relo, this->data_to_parse->data() + base_relocation_offset, sizeof(IMAGE_BASE_RELOCATION));
-
-            /* last basereloc empty, end reached -> terminate */
-            if (temp_base_relo.SizeOfBlock == 0 && temp_base_relo.VirtualAddress == 0)
-            {
-                break;
-            }
-
-            this->base_relocs->emplace_back(temp_base_relo);
-
-            basereloc_directory_counter++;
-            basereloc_size_counter += temp_base_relo.SizeOfBlock;
-        }
-
-	}
+    }
 
     PIMAGE_DOS_HEADER get_dos_header() const {
         return this->m_dos_header;
@@ -235,9 +204,9 @@ public:
     }
 
     std::unique_ptr<IMAGE_OPTIONAL_HEADER32> get_optional_headers() const
-	{
+    {
         return std::make_unique<IMAGE_OPTIONAL_HEADER32>(this->m_nt_header->OptionalHeader);
-	}
+    }
 
     DWORD rva_to_offset(DWORD rva, PIMAGE_SECTION_HEADER section_headers, int number_of_sections) {
         for (int i = 0; i < number_of_sections; i++) {
@@ -256,7 +225,6 @@ private:
     std::shared_ptr<std::vector<char>> data_to_parse;
     std::shared_ptr<std::vector<IMAGE_SECTION_HEADER>> section_headers;
     std::shared_ptr<std::vector<PEDLLType>> imports;
-    std::shared_ptr<std::vector<IMAGE_BASE_RELOCATION>> base_relocs;
     PIMAGE_DOS_HEADER m_dos_header;
     PIMAGE_NT_HEADERS32 m_nt_header;
     PIMAGE_OPTIONAL_HEADER32 m_opt_nt_header;
