@@ -1,15 +1,17 @@
 #pragma once
 
+#include <windows.h>
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <vector>
 #include <winnt.h>
-#include <iostream>
 
 class PEParser
 {
 public:
-	PEParser(std::unique_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr)
+	PEParser(std::shared_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr)
 	{
         /* check passed data (vector) */
         if (this->data_to_parse->empty()) {
@@ -58,7 +60,7 @@ public:
             throw std::runtime_error("Invalid section header offset.");
         }
 
-        /* retrieve number of sections present in loaded file */ 
+        /* retrieve number of sections present in loaded file */
         const uint32_t n_sections = this->m_nt_header->FileHeader.NumberOfSections;
 
         /* verify filesize */
@@ -88,7 +90,7 @@ public:
         DWORD fin_addr = rva_to_offset(virtual_addr_import, section_headers, n_sections);
 
         int import_directory_count = 0;
-        
+
         /* while no empty descriptor was found */
         while (true) {
             IMAGE_IMPORT_DESCRIPTOR tmp;
@@ -125,24 +127,6 @@ public:
 
             printf("%s:\n", fin_name);
             delete[] fin_name;
-
-            /* -> name parsing & stuff finished */
-
-            /* lookup the ILT */
-            DWORD first_thunk = tmp.OriginalFirstThunk != 0 ? tmp.OriginalFirstThunk : tmp.FirstThunk;
-
-            if (tmp.TimeDateStamp == 0)
-            {
-                std::cout << "BOUND: FALSE\n";
-            }
-            else if (tmp.TimeDateStamp == -1)
-            {
-                std::cout << "BOUND: TRUE\n";
-            }
-
-
-
-            import_directory_count++;
         }
 
 	}

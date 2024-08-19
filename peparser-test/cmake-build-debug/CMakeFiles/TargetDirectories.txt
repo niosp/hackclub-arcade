@@ -1,0 +1,3 @@
+C:/Users/User/CLionProjects/peparser-test/cmake-build-debug/CMakeFiles/peparser_test.dir
+C:/Users/User/CLionProjects/peparser-test/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/User/CLionProjects/peparser-test/cmake-build-debug/CMakeFiles/rebuild_cache.dir
