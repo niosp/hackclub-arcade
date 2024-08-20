@@ -430,7 +430,7 @@ int main(int argc, char* argv[])
 
         /* todo: calculate amount of entries  */
 
-        base_relocations_vec.emplace_back(temp_base_relo);
+        base_relocations_vec.emplace_back(temp_base_relo); 
 
         basereloc_directory_counter++;
         basereloc_size_counter += temp_base_relo.SizeOfBlock;

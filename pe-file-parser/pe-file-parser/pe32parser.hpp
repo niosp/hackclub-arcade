@@ -74,7 +74,7 @@ public:
         }
 
         /* retrieve number of sections present in loaded file */
-        const uint32_t n_sections = this->m_nt_header->FileHeader.NumberOfSections;
+        const DWORD n_sections = this->m_nt_header->FileHeader.NumberOfSections;
 
         /* verify filesize */
         if (this->data_to_parse->size() < section_header_offset + n_sections * sizeof(IMAGE_SECTION_HEADER)) {
@@ -158,9 +158,9 @@ public:
             /* file offset to thunk data */
             DWORD arr_thunk_data = rva_to_offset(tmp.OriginalFirstThunk, section_headers, n_sections);
 
-            std::vector<std::string> function_names;
+            std::vector<std::string> function_names = {};
 
-            IMAGE_THUNK_DATA32* thunk_data = (IMAGE_THUNK_DATA32*)(this->data_to_parse->data() + arr_thunk_data);
+            IMAGE_THUNK_DATA32* thunk_data = reinterpret_cast<IMAGE_THUNK_DATA32*>(this->data_to_parse->data() + arr_thunk_data);
 
             while (thunk_data->u1.AddressOfData) {
                 if (thunk_data->u1.AddressOfData & IMAGE_ORDINAL_FLAG32) {
@@ -170,7 +170,7 @@ public:
                 }
                 else {
                     /* normal import by name */
-                    IMAGE_IMPORT_BY_NAME* import_by_name = (IMAGE_IMPORT_BY_NAME*)(this->data_to_parse->data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, n_sections));
+                    IMAGE_IMPORT_BY_NAME* import_by_name = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(this->data_to_parse->data() + rva_to_offset(thunk_data->u1.AddressOfData, section_headers, n_sections));
                     function_names.emplace_back(import_by_name->Name);
                 }
                 thunk_data++;
@@ -182,16 +182,46 @@ public:
 
             imports->emplace_back(dll_temp);
 
-            for (size_t i = 0; i < function_names.size(); ++i) {
-                std::cout << function_names[i] << " ";
-            }
-            std::cout << std::endl;
-
             delete[] fin_name;
 
             import_directory_count++;
         }
-        std::cout << "parsing finished" << std::endl;
+
+        /* set to enable later usage of rva calculator (non-static) */
+        this->n_sections_g = n_sections;
+        this->section_hdrs_p = section_headers;
+
+        /* get base relocation directory */
+        IMAGE_DATA_DIRECTORY directory_entry_basereloc_rva = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+        /* calculate file offset of basereloc directory */
+        DWORD base_relocation_directory_addr = rva_to_offset(directory_entry_basereloc_rva.VirtualAddress);
+
+        DWORD basereloc_size_counter = 0;
+        DWORD basereloc_directory_counter = 0;
+
+        this->base_relocs = std::make_shared<std::vector<IMAGE_BASE_RELOCATION>>();
+
+        while (true)
+        {
+            IMAGE_BASE_RELOCATION temp_base_relo;
+
+            /* add base reloc blocks on top to the directory file offset */
+            DWORD base_relocation_offset = (basereloc_size_counter + base_relocation_directory_addr);
+
+            std::memcpy(&temp_base_relo, this->data_to_parse->data() + base_relocation_offset, sizeof(IMAGE_BASE_RELOCATION));
+
+            /* last reloc reached, terminate */
+            if (temp_base_relo.SizeOfBlock == 0 && temp_base_relo.VirtualAddress == 0)
+            {
+                break;
+            }
+
+            this->base_relocs->emplace_back(temp_base_relo);
+
+            basereloc_directory_counter++;
+            basereloc_size_counter += temp_base_relo.SizeOfBlock;
+        }
 
     }
 
@@ -208,11 +238,24 @@ public:
         return std::make_unique<IMAGE_OPTIONAL_HEADER32>(this->m_nt_header->OptionalHeader);
     }
 
-    DWORD rva_to_offset(DWORD rva, PIMAGE_SECTION_HEADER section_headers, int number_of_sections) {
-        for (int i = 0; i < number_of_sections; i++) {
-            PIMAGE_SECTION_HEADER section = &section_headers[i];
-            DWORD section_start = section->VirtualAddress;
-            DWORD section_end = section_start + section->Misc.VirtualSize;
+    static DWORD rva_to_offset(DWORD rva, PIMAGE_SECTION_HEADER p_section_headers, int p_number_of_sections) {
+        for (int i = 0; i < p_number_of_sections; i++) {
+            const PIMAGE_SECTION_HEADER section = &p_section_headers[i];
+            const DWORD section_start = section->VirtualAddress;
+            const DWORD section_end = section_start + section->Misc.VirtualSize;
+
+            if (rva >= section_start && rva < section_end) {
+                return (rva - section_start) + section->PointerToRawData;
+            }
+        }
+        return 0;
+    }
+
+    DWORD rva_to_offset(DWORD rva) const {
+        for (int i = 0; i < this->n_sections_g; i++) {
+            const PIMAGE_SECTION_HEADER section = &this->section_hdrs_p[i];
+            const DWORD section_start = section->VirtualAddress;
+            const DWORD section_end = section_start + section->Misc.VirtualSize;
 
             if (rva >= section_start && rva < section_end) {
                 return (rva - section_start) + section->PointerToRawData;
@@ -225,7 +268,10 @@ private:
     std::shared_ptr<std::vector<char>> data_to_parse;
     std::shared_ptr<std::vector<IMAGE_SECTION_HEADER>> section_headers;
     std::shared_ptr<std::vector<PEDLLType>> imports;
+    std::shared_ptr<std::vector<IMAGE_BASE_RELOCATION>> base_relocs;
     PIMAGE_DOS_HEADER m_dos_header;
     PIMAGE_NT_HEADERS32 m_nt_header;
     PIMAGE_OPTIONAL_HEADER32 m_opt_nt_header;
+    PIMAGE_SECTION_HEADER section_hdrs_p;
+    DWORD n_sections_g;
 };
