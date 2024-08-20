@@ -223,6 +223,135 @@ public:
             basereloc_size_counter += temp_base_relo.SizeOfBlock;
         }
 
+        /* base reloc parsing done */
+
+		/* get the data directory itself */
+        IMAGE_DATA_DIRECTORY resource_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE];
+
+        DWORD resource_size = resource_directory.Size;
+        DWORD resource_rva = resource_directory.VirtualAddress;
+
+        /* convert the rva from resource_directory->VirtualAddress to the file offset (so resource section starts at resource_offset */
+        DWORD resource_offset = rva_to_offset(resource_rva);
+
+        PIMAGE_RESOURCE_DIRECTORY dir = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY>(this->data_to_parse->data() + resource_offset);
+
+        bool end_in_dir_reached = false;
+
+        DWORD ctr = 0;
+
+        std::shared_ptr<std::vector<PIMAGE_RESOURCE_DIRECTORY>> parsed_resource_directory = std::make_shared<std::vector<PIMAGE_RESOURCE_DIRECTORY>>();
+
+        parsed_resource_directory->emplace_back(dir);
+
+        if (resource_directory.Size != 0)
+        {
+            for (int i = 0; i < dir->NumberOfIdEntries + dir->NumberOfNamedEntries; i++)
+            {
+                PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1 = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+                /* insert smart pointer to ResourceDirectoryEntry object into vector */
+                auto dir_entry_1_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_1.Name, dir_entry_1.OffsetToData);
+                resource_dir_s->insert_directory_entry(dir_entry_1_ptr);
+
+                /////////////////////
+
+                /* get the directory the entry points to */
+                IMAGE_RESOURCE_DIRECTORY dir_1;
+                DWORD dir_1_offset = dir_entry_1.OffsetToDirectory + resource_offset;
+                file_stream.seekg(dir_1_offset, std::ios_base::beg);
+                file_stream.read(reinterpret_cast<char*>(&dir_1), sizeof(IMAGE_RESOURCE_DIRECTORY));
+
+                auto dir_1_ptr = std::make_shared<ResourceDirectory>(dir_1.Characteristics, dir_1.TimeDateStamp, dir_1.MajorVersion, dir_1.MinorVersion, dir_1.NumberOfNamedEntries, dir_1.NumberOfIdEntries);
+                dir_entry_1_ptr->insert_nested_directory(dir_1_ptr);
+
+                /////////////////////
+
+                /* iterate through the directory mentioned in last comment */
+                for (int j = 0; j < dir_1.NumberOfNamedEntries + dir_1.NumberOfIdEntries; j++)
+                {
+                    std::cout << "FOR2: " << dir_1.NumberOfNamedEntries + dir_1.NumberOfIdEntries << "\n";
+
+                    /////////////////////
+
+                    /* get the directory entry */
+                    IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_2;
+                    file_stream.seekg(dir_1_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + j * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
+                    file_stream.read(reinterpret_cast<char*>(&dir_entry_2), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                    auto dir_entry_2_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_2.Name, dir_entry_2.OffsetToData);
+                    dir_1_ptr->insert_directory_entry(dir_entry_2_ptr);
+
+                    /////////////////////
+
+                    /* get nested resource directory */
+                    IMAGE_RESOURCE_DIRECTORY dir_2;
+                    DWORD dir_2_offset = dir_entry_2.OffsetToDirectory + resource_offset;
+                    file_stream.seekg(dir_2_offset, std::ios_base::beg);
+                    file_stream.read(reinterpret_cast<char*>(&dir_2), sizeof(IMAGE_RESOURCE_DIRECTORY));
+
+                    auto dir_2_ptr = std::make_shared<ResourceDirectory>(dir_2.Characteristics, dir_2.TimeDateStamp, dir_2.MajorVersion, dir_2.MinorVersion, dir_2.NumberOfNamedEntries, dir_2.NumberOfIdEntries);
+                    dir_entry_2_ptr->insert_nested_directory(dir_2_ptr);
+
+                    /////////////////////
+
+                    /* for every entry in directory dir_2 */
+                    for (int k = 0; k < dir_2.NumberOfNamedEntries + dir_2.NumberOfIdEntries; k++)
+                    {
+                        std::cout << "FOR3: " << dir_2.NumberOfNamedEntries + dir_2.NumberOfIdEntries << "\n";
+
+                        /* receive last & final entry (resource directory entry) */
+                        IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_3;
+                        file_stream.seekg(dir_2_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + k * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
+                        file_stream.read(reinterpret_cast<char*>(&dir_entry_3), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                        /////////////////////
+
+                        auto dir_entry_3_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_3.Name, dir_entry_3.OffsetToData);
+                        dir_2_ptr->insert_directory_entry(dir_entry_3_ptr);
+
+                        /////////////////////
+
+                        IMAGE_RESOURCE_DATA_ENTRY data_entry;
+                        file_stream.seekg(dir_entry_3.OffsetToData + resource_offset, std::ios_base::beg);
+                        file_stream.read(reinterpret_cast<char*>(&data_entry), sizeof(IMAGE_RESOURCE_DATA_ENTRY));
+
+                        /////////////////////
+
+                        auto dir_data = std::make_shared<ResourceData>(data_entry.OffsetToData, data_entry.Size, data_entry.CodePage);
+                        dir_entry_3_ptr->insert_resource_data(dir_data);
+
+                        /////////////////////
+
+                        /* todo: get the resource data entry pointed to by dir_entry_3->OffsetToData */
+                        /* todo: print nice tree structure */
+                    }
+
+                }
+            }
+        }
+
+        for (const auto& root_directory : parsed_resource_directory)
+        {
+            std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_1_root = root_directory->get_directory_entries();
+            for (const auto& entry_1_root : *entries_1_root
+            {
+                std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> directories_2 = entry_1_root->get_nested_directories();
+                for (const auto& directory_2_entry : *directories_2) // directory (level2)
+                {
+                    std::cout << directory_2_entry << std::endl;
+                }
+            }
+        }
+
+
+        IMAGE_DATA_DIRECTORY debug_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+
+        DWORD debug_directory_rva = rva_to_offset(debug_directory.VirtualAddress, section_headers, number_of_sections);
+
+        IMAGE_DEBUG_DIRECTORY debug_dir_inst;
+
+        file_stream.seekg(debug_directory_rva, std::ios_base::beg);
+        file_stream.read(reinterpret_cast<char*>(&debug_dir_inst), sizeof(IMAGE_DEBUG_DIRECTORY));
     }
 
     PIMAGE_DOS_HEADER get_dos_header() const {
