@@ -9,11 +9,6 @@ C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-pars
   C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(113,17):
   consider using '%I64d' in the format string
   
-  ResourceData.cpp
-  ResourceDirectory.cpp
-  ResourceDirectoryEntry.cpp
-  Generating Code...
-  LINK : C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\x64\Debug\pe-file-parser.exe not found or not built by the last incremental link; performing full link
   pe-file-parser.vcxproj -> C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\x64\Debug\pe-file-parser.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.
