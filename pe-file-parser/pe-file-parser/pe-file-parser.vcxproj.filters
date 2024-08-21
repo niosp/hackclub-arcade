@@ -27,6 +27,12 @@
     <ClCompile Include="ResourceData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="OldParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TestMaincpp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ResourceDirectory.hpp">

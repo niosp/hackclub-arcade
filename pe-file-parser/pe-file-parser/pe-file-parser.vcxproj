@@ -127,10 +127,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="OldParser.cpp" />
     <ClCompile Include="pe-file-parser.cpp" />
     <ClCompile Include="ResourceData.cpp" />
     <ClCompile Include="ResourceDirectory.cpp" />
     <ClCompile Include="ResourceDirectoryEntry.cpp" />
+    <ClCompile Include="TestMaincpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pe32parser.hpp" />

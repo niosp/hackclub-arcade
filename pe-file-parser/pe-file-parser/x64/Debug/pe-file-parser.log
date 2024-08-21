@@ -1,12 +1,12 @@
-﻿  pe-file-parser.cpp
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(47,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(80,23): warning C4018: '<': signed/unsigned mismatch
-C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(113,17): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'std::streamsize'
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(113,17):
+﻿  OldParser.cpp
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\OldParser.cpp(47,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\OldParser.cpp(80,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\OldParser.cpp(113,17): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type 'std::streamsize'
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\OldParser.cpp(113,17):
   consider using '%lld' in the format string
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(113,17):
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\OldParser.cpp(113,17):
   consider using '%Id' in the format string
-  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\pe-file-parser.cpp(113,17):
+  C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\pe-file-parser\OldParser.cpp(113,17):
   consider using '%I64d' in the format string
   
   pe-file-parser.vcxproj -> C:\Users\User\Desktop\hackclub-arcade\pe-file-parser\x64\Debug\pe-file-parser.exe

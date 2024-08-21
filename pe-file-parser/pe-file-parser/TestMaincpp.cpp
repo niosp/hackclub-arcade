@@ -8,7 +8,7 @@
 
 #include "pe32parser.hpp"
 
-int main(int argc, char* argv[])
+int changeme(int argc, char* argv[])
 {
     if (argc <= 1) {
         std::cerr << "Usage: " << argv[0] << " <PE file path>\n";
