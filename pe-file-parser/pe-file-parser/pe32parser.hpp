@@ -11,6 +11,37 @@
 #include <string>
 #include <sstream>
 
+class ImageResourceDirEntryW;
+
+class ImageResourceDirEntryW
+{
+public:
+    ImageResourceDirEntryW(PIMAGE_RESOURCE_DIRECTORY_ENTRY p_dir_entry) : dir_entry_ptr(p_dir_entry)
+    {
+        this->nested_directories = std::make_shared<std::vector<std::shared_ptr<ImageResourceDirW>>>();
+    }
+private:
+    PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_ptr;
+    std::shared_ptr<std::vector<std::shared_ptr<ImageResourceDirW>>> nested_directories;
+};
+
+class ImageResourceDirW
+{
+public:
+    ImageResourceDirW(PIMAGE_RESOURCE_DIRECTORY p_dir) : dir_ptr(p_dir)
+    {
+        this->resource_entries = std::make_shared<std::vector<ImageResourceDirEntryW>>();
+    }
+
+    void insert_directory_entry(std::shared_ptr<ImageResourceDirEntryW> p_entry) const
+    {
+        this->resource_entries->emplace_back(p_entry);
+    }
+private:
+    PIMAGE_RESOURCE_DIRECTORY dir_ptr;
+    std::shared_ptr<std::vector<std::shared_ptr<ImageResourceDirEntryW>>> resource_entries;
+};
+
 class PEDLLType
 {
 public:
@@ -225,7 +256,8 @@ public:
 
         /* base reloc parsing done */
 
-		/* get the data directory itself */
+        /* .rsrc */
+        /* get the data directory itself */
         IMAGE_DATA_DIRECTORY resource_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE];
 
         DWORD resource_size = resource_directory.Size;
@@ -234,32 +266,44 @@ public:
         /* convert the rva from resource_directory->VirtualAddress to the file offset (so resource section starts at resource_offset */
         DWORD resource_offset = rva_to_offset(resource_rva);
 
+        /* "root" resource directory */
         PIMAGE_RESOURCE_DIRECTORY dir = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY>(this->data_to_parse->data() + resource_offset);
 
         bool end_in_dir_reached = false;
 
         DWORD ctr = 0;
 
-        std::shared_ptr<std::vector<PIMAGE_RESOURCE_DIRECTORY>> parsed_resource_directory = std::make_shared<std::vector<PIMAGE_RESOURCE_DIRECTORY>>();
-
-        parsed_resource_directory->emplace_back(dir);
+        std::shared_ptr<ImageResourceDirW> root_dir = std::make_shared<ImageResourceDirW>(dir);
 
         if (resource_directory.Size != 0)
         {
+            /* entries inside root (/) resource directory */
             for (int i = 0; i < dir->NumberOfIdEntries + dir->NumberOfNamedEntries; i++)
             {
-                PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1 = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
-                /* insert smart pointer to ResourceDirectoryEntry object into vector */
-                auto dir_entry_1_ptr = std::make_shared<ResourceDirectoryEntry>(dir_entry_1.Name, dir_entry_1.OffsetToData);
-                resource_dir_s->insert_directory_entry(dir_entry_1_ptr);
+                std::cout << "\n" << ctr++ << "\n";
+                std::cout << "\n\nFOR1: " << dir->NumberOfIdEntries + dir->NumberOfNamedEntries << "\n";
+
+                /////////////////////
+
+                /* get the entry */
+                //IMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1;
+                //file_stream.seekg(resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY), std::ios_base::beg);
+                //file_stream.read(reinterpret_cast<char*>(&dir_entry_1), sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY)));
+
+                root_dir->insert_directory_entry(std::make_shared<ImageResourceDirEntryW>(dir_entry_1_p));
 
                 /////////////////////
 
                 /* get the directory the entry points to */
-                IMAGE_RESOURCE_DIRECTORY dir_1;
-                DWORD dir_1_offset = dir_entry_1.OffsetToDirectory + resource_offset;
-                file_stream.seekg(dir_1_offset, std::ios_base::beg);
-                file_stream.read(reinterpret_cast<char*>(&dir_1), sizeof(IMAGE_RESOURCE_DIRECTORY));
+                PIMAGE_RESOURCE_DIRECTORY dir_1_p;
+                DWORD dir_1_offset = dir_entry_1_p->OffsetToDirectory + resource_offset;
+
+                dir_1_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY>(dir_1_offset);
+
+                // file_stream.seekg(dir_1_offset, std::ios_base::beg);
+                // file_stream.read(reinterpret_cast<char*>(&dir_1), sizeof(IMAGE_RESOURCE_DIRECTORY));
 
                 auto dir_1_ptr = std::make_shared<ResourceDirectory>(dir_1.Characteristics, dir_1.TimeDateStamp, dir_1.MajorVersion, dir_1.MinorVersion, dir_1.NumberOfNamedEntries, dir_1.NumberOfIdEntries);
                 dir_entry_1_ptr->insert_nested_directory(dir_1_ptr);
@@ -330,28 +374,6 @@ public:
             }
         }
 
-        for (const auto& root_directory : parsed_resource_directory)
-        {
-            std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_1_root = root_directory->get_directory_entries();
-            for (const auto& entry_1_root : *entries_1_root
-            {
-                std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> directories_2 = entry_1_root->get_nested_directories();
-                for (const auto& directory_2_entry : *directories_2) // directory (level2)
-                {
-                    std::cout << directory_2_entry << std::endl;
-                }
-            }
-        }
-
-
-        IMAGE_DATA_DIRECTORY debug_directory = parsed_optional_header.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
-
-        DWORD debug_directory_rva = rva_to_offset(debug_directory.VirtualAddress, section_headers, number_of_sections);
-
-        IMAGE_DEBUG_DIRECTORY debug_dir_inst;
-
-        file_stream.seekg(debug_directory_rva, std::ios_base::beg);
-        file_stream.read(reinterpret_cast<char*>(&debug_dir_inst), sizeof(IMAGE_DEBUG_DIRECTORY));
     }
 
     PIMAGE_DOS_HEADER get_dos_header() const {
