@@ -373,35 +373,6 @@ public:
             }
         }
 
-			/* print the resource directory */
-
-			std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_1_root = root_directory->get_directory_entries();
-            for (const auto& entry_1_root : *entries_1_root) // entry
-            {
-                std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> directories_2 = entry_1_root->get_nested_directories();
-                for (const auto& directory_2_entry : *directories_2) // directory (level2)
-                {
-                    std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_2 = directory_2_entry->get_directory_entries();
-                    for (const auto& entry_2 : *entries_2) //entry
-                    {
-                        std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> directories_3 = entry_2->get_nested_directories();
-                        for (const auto& directory_3_entry : *directories_3) // directory (level3)
-                        {
-                            std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_3 = directory_3_entry->get_directory_entries();
-                            for (const auto& entry_3 : *entries_3) // entry
-                            {
-                                std::shared_ptr<ResourceData> rs = entry_3->get_stored_resource_data();
-                                std::printf("Code page: 0x%08X\n", rs->get_code_page());
-                                std::printf("Offset to data: 0x%08X\n", rs->get_offset_to_data());
-                                std::printf("Size: 0x%08X\n", rs->get_size());
-                            }
-                        }
-
-                    }
-
-                }
-            }
-
         /* debug parsing */
 
         IMAGE_DATA_DIRECTORY debug_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
