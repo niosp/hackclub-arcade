@@ -9,10 +9,12 @@
 #include <winnt.h>
 #include <iostream>
 #include <string>
-#include <sstream>
 #include <bitset>
 
 class ImageResourceDirW;
+class ImageResourceDirEntryW;
+
+using DirEntryW_Vec = std::shared_ptr<std::vector<std::shared_ptr<ImageResourceDirEntryW>>>;
 
 class ImageResourceDirEntryW
 {
@@ -70,9 +72,19 @@ public:
     {
         this->resource_entries->emplace_back(p_entry);
     }
+
+    PIMAGE_RESOURCE_DIRECTORY get_resource_directory() const
+    {
+        return this->dir_ptr;
+    }
+
+    DirEntryW_Vec get_resource_entries() const
+    {
+        return this->resource_entries;
+    }
 private:
     PIMAGE_RESOURCE_DIRECTORY dir_ptr;
-    std::shared_ptr<std::vector<std::shared_ptr<ImageResourceDirEntryW>>> resource_entries;
+    DirEntryW_Vec resource_entries;
 };
 
 class PEDLLType
@@ -313,12 +325,10 @@ public:
             /* entries inside root (/) resource directory */
             for (int i = 0; i < dir->NumberOfIdEntries + dir->NumberOfNamedEntries; i++)
             {
-                std::cout << "\n" << ctr++ << "\n";
-                std::cout << "\n\nFOR1: " << dir->NumberOfIdEntries + dir->NumberOfNamedEntries << "\n";
-
                 /* get the entry */
 
                 PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
                 std::shared_ptr<ImageResourceDirEntryW> dir_entry_1_s_p = std::make_shared<ImageResourceDirEntryW>(dir_entry_1_p);
 
                 root_dir->insert_directory_entry(dir_entry_1_s_p);
@@ -336,12 +346,11 @@ public:
                 /* iterate through the directory mentioned in last comment */
                 for (int j = 0; j < dir_1_p->NumberOfNamedEntries + dir_1_p->NumberOfIdEntries; j++)
                 {
-                    std::cout << "FOR2: " << dir_1_p->NumberOfNamedEntries + dir_1_p->NumberOfIdEntries << "\n";
-
                     /* get the directory entry */
                     PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_2_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + dir_1_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + j * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
                     std::shared_ptr<ImageResourceDirEntryW> dir_entry_2_s_p = std::make_shared<ImageResourceDirEntryW>(dir_entry_2_p);
+
                     dir_1_s_p->insert_directory_entry(dir_entry_2_s_p);
 
                     /* get nested resource directory */
@@ -356,12 +365,11 @@ public:
                     /* for every entry in directory dir_2 */
                     for (int k = 0; k < dir_2_p->NumberOfNamedEntries + dir_2_p->NumberOfIdEntries; k++)
                     {
-                        std::cout << "FOR3: " << dir_2_p->NumberOfNamedEntries + dir_2_p->NumberOfIdEntries << "\n";
-
                         /* receive last & final entry (resource directory entry) */
                         PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_3_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + dir_2_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + k * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
 
                         std::shared_ptr<ImageResourceDirEntryW> dir_entry_3_ptr = std::make_shared<ImageResourceDirEntryW>(dir_entry_3_p);
+
                         dir_2_s_p->insert_directory_entry(dir_entry_3_ptr);
 
                         PIMAGE_RESOURCE_DATA_ENTRY data_entry = reinterpret_cast<PIMAGE_RESOURCE_DATA_ENTRY>(this->data_to_parse->data() + dir_entry_3_p->OffsetToData + resource_offset);
@@ -372,35 +380,6 @@ public:
                 }
             }
         }
-
-			/* print the resource directory */
-
-			std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_1_root = root_directory->get_directory_entries();
-            for (const auto& entry_1_root : *entries_1_root) // entry
-            {
-                std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> directories_2 = entry_1_root->get_nested_directories();
-                for (const auto& directory_2_entry : *directories_2) // directory (level2)
-                {
-                    std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_2 = directory_2_entry->get_directory_entries();
-                    for (const auto& entry_2 : *entries_2) //entry
-                    {
-                        std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectory>>> directories_3 = entry_2->get_nested_directories();
-                        for (const auto& directory_3_entry : *directories_3) // directory (level3)
-                        {
-                            std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_3 = directory_3_entry->get_directory_entries();
-                            for (const auto& entry_3 : *entries_3) // entry
-                            {
-                                std::shared_ptr<ResourceData> rs = entry_3->get_stored_resource_data();
-                                std::printf("Code page: 0x%08X\n", rs->get_code_page());
-                                std::printf("Offset to data: 0x%08X\n", rs->get_offset_to_data());
-                                std::printf("Size: 0x%08X\n", rs->get_size());
-                            }
-                        }
-
-                    }
-
-                }
-            }
 
         /* debug parsing */
 
@@ -417,8 +396,6 @@ public:
         DWORD tls_directory_rva = rva_to_offset(debug_directory.VirtualAddress);
 
         this->tls_dir_p = reinterpret_cast<PIMAGE_TLS_DIRECTORY>(this->data_to_parse->data() + tls_directory_rva);
-
-        std::cout << "asd" << std::endl;
     }
 
     PIMAGE_DOS_HEADER get_dos_header() const {

@@ -10,30 +10,12 @@
 #include "ResourceDirectoryEntry.hpp"
 #include "ResourceData.hpp"
 
-const std::string RESET_COLOR = "\033[0m";
-const std::string RED_COLOR = "\033[31m";
-const std::string GREEN_COLOR = "\033[32m";
-const std::string YELLOW_COLOR = "\033[33m";
-const std::string BLUE_COLOR = "\033[34m";
-const std::string MAGENTA_COLOR = "\033[35m";
-const std::string CYAN_COLOR = "\033[36m";
-
-void print_staircase(const std::vector<std::string>& items, int indentation) {
-    const std::vector<std::string> colors = { RED_COLOR, GREEN_COLOR, YELLOW_COLOR,BLUE_COLOR, MAGENTA_COLOR, CYAN_COLOR };
-    for (size_t i = 0; i < items.size(); ++i) {
-        for (int j = 0; j < i * indentation; ++j) {
-            std::cout << ' ';
-        }
-        std::cout << colors[i % colors.size()] << items[i] << RESET_COLOR << "\n";
+void print_staircase(const std::string& text, int indent) {
+    for (size_t i = 0; i < text.length(); ++i) {
+        /* print leading spaces based on the current index and indent */
+        std::cout << std::string(i * indent, ' ');
+    	std::cout << text[i] << "\n";
     }
-}
-
-
-template<typename T>
-T readData(std::ifstream& file) {
-    T data;
-    file.read(reinterpret_cast<char*>(&data), sizeof(T));
-    return data;
 }
 
 void read_resource_directory_entry(std::ifstream& file, IMAGE_RESOURCE_DIRECTORY_ENTRY& entry) {
@@ -59,7 +41,6 @@ DWORD resolve(DWORD VA, int index, PIMAGE_SECTION_HEADER section_headers) {
     return (VA - section_headers[index].VirtualAddress) + section_headers[index].PointerToRawData;
 
 }
-
 
 DWORD rva_to_offset(DWORD rva, PIMAGE_SECTION_HEADER section_headers, int number_of_sections) {
     for (int i = 0; i < number_of_sections; i++) {
@@ -561,12 +542,8 @@ int changeit(int argc, char* argv[])
             }
         }
 
-        /*
-         * vector:  std::vector<std::shared_ptr<ResourceDirectory>>
-         */
-         /*
-             for (const auto& root_directory : parsed_resource_directory) // directory -> root directory!
-             {
+		for (const auto& root_directory : parsed_resource_directory) // directory -> root directory!
+		{
                  std::shared_ptr<std::vector<std::shared_ptr<ResourceDirectoryEntry>>> entries_1_root = root_directory->get_directory_entries();
                  for (const auto& entry_1_root : *entries_1_root) // entry
                  {
@@ -593,8 +570,7 @@ int changeit(int argc, char* argv[])
 
                      }
                  }
-             }
-          */
+		}
     }
 
     /* parse debug information (from directory) */
