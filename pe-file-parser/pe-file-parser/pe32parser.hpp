@@ -100,8 +100,52 @@ private:
 class PEParser
 {
 public:
-    PEParser(std::shared_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr)
+    PEParser(const std::string& filename) : data_to_parse(nullptr), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr), m_opt_nt_header(nullptr)
     {
+        /* create file stream */
+        std::ifstream file_stream(filename, std::ios::binary | std::ios::ate);
+        if (!file_stream.is_open()) {
+            std::cerr << "Failed to open the file: " << filename << "\n";
+        }
+
+        /* calculate file size */
+        std::streamsize file_size = file_stream.tellg();
+
+        /* create shared ptr to vector (file contents) */
+        std::shared_ptr<std::vector<char>> file_contents = std::make_shared<std::vector<char>>(file_size);
+
+        if (!file_stream.read(file_contents->data(), file_size)) {
+            std::cerr << "Failed to read the file into the buffer." << "\n";
+            return 1;
+        }
+
+        this->data_to_parse = std::move(file_contents);
+
+        /* data ready to parse */
+        this->parse();
+    }
+    PEParser(std::shared_ptr<std::ifstream> p_file_stream) : data_to_parse(nullptr), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr), m_opt_nt_header(nullptr)
+    {
+        std::streamsize file_size = p_file_stream->tellg();
+
+        p_file_stream->seekg(0, std::ios::beg);
+
+        std::shared_ptr<std::vector<char>> file_contents = std::make_shared<std::vector<char>>(file_size);
+
+        if (!p_file_stream->read(file_contents->data(), file_size)) {
+            std::cerr << "Failed to read the file into the buffer\n";
+        }
+
+        this->data_to_parse = std::move(file_contents);
+
+        /* data ready to parse */
+        this->parse();
+    }
+    PEParser(std::shared_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr) {
+        this->parse();
+    }
+    
+    void parse() {
         /* check passed data (vector) */
         if (this->data_to_parse->empty()) {
             throw std::invalid_argument("File data is empty.");
@@ -341,7 +385,7 @@ public:
 
                 std::shared_ptr<ImageResourceDirW> dir_1_s_p = std::make_shared<ImageResourceDirW>(dir_1_p);
 
-            	dir_entry_1_s_p->insert_nested_directory(dir_1_s_p);
+                dir_entry_1_s_p->insert_nested_directory(dir_1_s_p);
 
                 /* iterate through the directory mentioned in last comment */
                 for (int j = 0; j < dir_1_p->NumberOfNamedEntries + dir_1_p->NumberOfIdEntries; j++)
@@ -397,6 +441,7 @@ public:
 
         this->tls_dir_p = reinterpret_cast<PIMAGE_TLS_DIRECTORY>(this->data_to_parse->data() + tls_directory_rva);
     }
+        
 
     PIMAGE_DOS_HEADER get_dos_header() const {
         return this->m_dos_header;
