@@ -7,6 +7,7 @@
 
 int main()
 {
+    ImGui::CreateContext();
     ImGui::NewFrame();
     char buf[20];
     float f;

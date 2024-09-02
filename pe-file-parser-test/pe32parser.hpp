@@ -9,7 +9,83 @@
 #include <winnt.h>
 #include <iostream>
 #include <string>
-#include <sstream>
+#include <bitset>
+
+class ImageResourceDirW;
+class ImageResourceDirEntryW;
+
+using DirEntryW_Vec = std::shared_ptr<std::vector<std::shared_ptr<ImageResourceDirEntryW>>>;
+
+class ImageResourceDirEntryW
+{
+public:
+    ImageResourceDirEntryW(PIMAGE_RESOURCE_DIRECTORY_ENTRY p_dir_entry) : dir_entry_ptr(p_dir_entry)
+    {
+        this->nested_directories = std::make_shared<std::vector<std::shared_ptr<ImageResourceDirW>>>();
+    }
+
+    void insert_nested_directory(std::shared_ptr<ImageResourceDirW> p_dir) const
+    {
+        this->nested_directories->emplace_back(p_dir);
+    }
+
+    DWORD get_data_is_directory() const
+    {
+        return (this->dir_entry_ptr->OffsetToData >> 31) & 1;
+    }
+
+    DWORD get_name_is_string() const
+    {
+        return (this->dir_entry_ptr->OffsetToData >> 31) & 1;
+    }
+
+    DWORD get_offset_to_directory() const
+    {
+        return (this->dir_entry_ptr->OffsetToData & 0x7FFFFFFF);
+    }
+
+    PIMAGE_RESOURCE_DATA_ENTRY get_stored_resource_data() const
+    {
+        return this->resource_data_entry_p;
+    }
+
+    void insert_resource_data(PIMAGE_RESOURCE_DATA_ENTRY p_resource_data)
+    {
+        this->resource_data_entry_p = p_resource_data;
+    }
+
+private:
+    PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_ptr;
+    PIMAGE_RESOURCE_DATA_ENTRY resource_data_entry_p;
+    std::shared_ptr<std::vector<std::shared_ptr<ImageResourceDirW>>> nested_directories;
+};
+
+class ImageResourceDirW
+{
+public:
+    ImageResourceDirW(PIMAGE_RESOURCE_DIRECTORY p_dir) : dir_ptr(p_dir)
+    {
+        this->resource_entries = std::make_shared<std::vector<std::shared_ptr<ImageResourceDirEntryW>>>();
+    }
+
+    void insert_directory_entry(std::shared_ptr<ImageResourceDirEntryW> p_entry) const
+    {
+        this->resource_entries->emplace_back(p_entry);
+    }
+
+    PIMAGE_RESOURCE_DIRECTORY get_resource_directory() const
+    {
+        return this->dir_ptr;
+    }
+
+    DirEntryW_Vec get_resource_entries() const
+    {
+        return this->resource_entries;
+    }
+private:
+    PIMAGE_RESOURCE_DIRECTORY dir_ptr;
+    DirEntryW_Vec resource_entries;
+};
 
 class PEDLLType
 {
@@ -24,8 +100,51 @@ private:
 class PEParser
 {
 public:
-    PEParser(std::shared_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr)
+    PEParser(const std::string& filename) : data_to_parse(nullptr), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr), m_opt_nt_header(nullptr)
     {
+        /* create file stream */
+        std::ifstream file_stream(filename, std::ios::binary | std::ios::ate);
+        if (!file_stream.is_open()) {
+            std::cerr << "Failed to open the file: " << filename << "\n";
+        }
+
+        /* calculate file size */
+        std::streamsize file_size = file_stream.tellg();
+
+        /* create shared ptr to vector (file contents) */
+        std::shared_ptr<std::vector<char>> file_contents = std::make_shared<std::vector<char>>(file_size);
+
+        if (!file_stream.read(file_contents->data(), file_size)) {
+            std::cerr << "Failed to read the file into the buffer." << "\n";
+        }
+
+        this->data_to_parse = std::move(file_contents);
+
+        /* data ready to parse */
+        this->parse();
+    }
+    PEParser(std::shared_ptr<std::ifstream> p_file_stream) : data_to_parse(nullptr), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr), m_opt_nt_header(nullptr)
+    {
+        std::streamsize file_size = p_file_stream->tellg();
+
+        p_file_stream->seekg(0, std::ios::beg);
+
+        std::shared_ptr<std::vector<char>> file_contents = std::make_shared<std::vector<char>>(file_size);
+
+        if (!p_file_stream->read(file_contents->data(), file_size)) {
+            std::cerr << "Failed to read the file into the buffer\n";
+        }
+
+        this->data_to_parse = std::move(file_contents);
+
+        /* data ready to parse */
+        this->parse();
+    }
+    PEParser(std::shared_ptr<std::vector<char>> file_vector) : data_to_parse(std::move(file_vector)), m_dos_header(nullptr), m_nt_header(nullptr), section_headers(nullptr) {
+        this->parse();
+    }
+
+    void parse() {
         /* check passed data (vector) */
         if (this->data_to_parse->empty()) {
             throw std::invalid_argument("File data is empty.");
@@ -223,7 +342,105 @@ public:
             basereloc_size_counter += temp_base_relo.SizeOfBlock;
         }
 
+        /* base reloc parsing done */
+
+        /* .rsrc */
+        /* get the data directory itself */
+        IMAGE_DATA_DIRECTORY resource_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE];
+
+        DWORD resource_size = resource_directory.Size;
+        DWORD resource_rva = resource_directory.VirtualAddress;
+
+        /* convert the rva from resource_directory->VirtualAddress to the file offset (so resource section starts at resource_offset */
+        DWORD resource_offset = rva_to_offset(resource_rva);
+
+        /* "root" resource directory */
+        PIMAGE_RESOURCE_DIRECTORY dir = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY>(this->data_to_parse->data() + resource_offset);
+
+        bool end_in_dir_reached = false;
+
+        DWORD ctr = 0;
+
+        this->root_dir = std::make_shared<ImageResourceDirW>(dir);
+
+        if (resource_directory.Size != 0)
+        {
+            /* entries inside root (/) resource directory */
+            for (int i = 0; i < dir->NumberOfIdEntries + dir->NumberOfNamedEntries; i++)
+            {
+                /* get the entry */
+
+                PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_1_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + resource_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                std::shared_ptr<ImageResourceDirEntryW> dir_entry_1_s_p = std::make_shared<ImageResourceDirEntryW>(dir_entry_1_p);
+
+                root_dir->insert_directory_entry(dir_entry_1_s_p);
+
+                /* get the directory the entry points to */
+                PIMAGE_RESOURCE_DIRECTORY dir_1_p;
+                DWORD dir_1_offset = dir_entry_1_p->OffsetToDirectory + resource_offset;
+
+                dir_1_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY>(this->data_to_parse->data() + dir_1_offset);
+
+                std::shared_ptr<ImageResourceDirW> dir_1_s_p = std::make_shared<ImageResourceDirW>(dir_1_p);
+
+                dir_entry_1_s_p->insert_nested_directory(dir_1_s_p);
+
+                /* iterate through the directory mentioned in last comment */
+                for (int j = 0; j < dir_1_p->NumberOfNamedEntries + dir_1_p->NumberOfIdEntries; j++)
+                {
+                    /* get the directory entry */
+                    PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_2_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + dir_1_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + j * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                    std::shared_ptr<ImageResourceDirEntryW> dir_entry_2_s_p = std::make_shared<ImageResourceDirEntryW>(dir_entry_2_p);
+
+                    dir_1_s_p->insert_directory_entry(dir_entry_2_s_p);
+
+                    /* get nested resource directory */
+                    DWORD dir_2_offset = dir_entry_2_p->OffsetToDirectory + resource_offset;
+
+                    PIMAGE_RESOURCE_DIRECTORY dir_2_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY>(this->data_to_parse->data() + dir_2_offset);
+
+                    std::shared_ptr<ImageResourceDirW> dir_2_s_p = std::make_shared<ImageResourceDirW>(dir_2_p);
+
+                    dir_entry_2_s_p->insert_nested_directory(dir_2_s_p);
+
+                    /* for every entry in directory dir_2 */
+                    for (int k = 0; k < dir_2_p->NumberOfNamedEntries + dir_2_p->NumberOfIdEntries; k++)
+                    {
+                        /* receive last & final entry (resource directory entry) */
+                        PIMAGE_RESOURCE_DIRECTORY_ENTRY dir_entry_3_p = reinterpret_cast<PIMAGE_RESOURCE_DIRECTORY_ENTRY>(this->data_to_parse->data() + dir_2_offset + sizeof(IMAGE_RESOURCE_DIRECTORY) + k * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY));
+
+                        std::shared_ptr<ImageResourceDirEntryW> dir_entry_3_ptr = std::make_shared<ImageResourceDirEntryW>(dir_entry_3_p);
+
+                        dir_2_s_p->insert_directory_entry(dir_entry_3_ptr);
+
+                        PIMAGE_RESOURCE_DATA_ENTRY data_entry = reinterpret_cast<PIMAGE_RESOURCE_DATA_ENTRY>(this->data_to_parse->data() + dir_entry_3_p->OffsetToData + resource_offset);
+
+                        dir_entry_3_ptr->insert_resource_data(data_entry);
+                    }
+
+                }
+            }
+        }
+
+        /* debug parsing */
+
+        IMAGE_DATA_DIRECTORY debug_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
+
+        DWORD debug_directory_rva = rva_to_offset(debug_directory.VirtualAddress);
+
+        this->debug_dir_p = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(this->data_to_parse->data() + debug_directory_rva);
+
+        /* tls (thread local storage) parsing */
+
+        IMAGE_DATA_DIRECTORY tls_directory = this->get_optional_headers()->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
+
+        DWORD tls_directory_rva = rva_to_offset(debug_directory.VirtualAddress);
+
+        this->tls_dir_p = reinterpret_cast<PIMAGE_TLS_DIRECTORY>(this->data_to_parse->data() + tls_directory_rva);
     }
+
 
     PIMAGE_DOS_HEADER get_dos_header() const {
         return this->m_dos_header;
@@ -269,9 +486,12 @@ private:
     std::shared_ptr<std::vector<IMAGE_SECTION_HEADER>> section_headers;
     std::shared_ptr<std::vector<PEDLLType>> imports;
     std::shared_ptr<std::vector<IMAGE_BASE_RELOCATION>> base_relocs;
+    std::shared_ptr<ImageResourceDirW> root_dir;
     PIMAGE_DOS_HEADER m_dos_header;
     PIMAGE_NT_HEADERS32 m_nt_header;
     PIMAGE_OPTIONAL_HEADER32 m_opt_nt_header;
     PIMAGE_SECTION_HEADER section_hdrs_p;
+    PIMAGE_DEBUG_DIRECTORY debug_dir_p;
+    PIMAGE_TLS_DIRECTORY tls_dir_p;
     DWORD n_sections_g;
 };

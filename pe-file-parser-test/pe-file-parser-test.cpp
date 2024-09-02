@@ -31,5 +31,5 @@ int main(int argc, char* argv[])
     std::printf("File read successfully. Size: %td bytes\n", file_size);
 
 
-    PEParser* parser = new PEParser();
+    PEParser* parser = new PEParser(buffer);
 }
