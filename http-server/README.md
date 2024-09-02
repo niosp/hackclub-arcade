@@ -26,3 +26,8 @@ Simple HTTP server written in C++
 - main.cpp: entry point, io_service, tcp server
 - Response.cpp: response class, handles crafting of responses, manages headers, status codes, messages etc.
 - ResponseTypes.cpp: contains possible response types (404 NOT FOUND, directory listing etc.)
+
+### How it looks
+![404 Error Page](http404.png)
+
+![Directory Listing](directoryListing.png)
